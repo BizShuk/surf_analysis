@@ -55,9 +55,8 @@ class OverlayRenderer:
         cv2.circle(frame, (cx, cy), 9, (0, 0, 0), 1)
 
         # primary text block (top-left)
-        lines = [
-            f"F:{record.metrics.weight_dist_front_pct:.0f}%  B:{100 - record.metrics.weight_dist_front_pct:.0f}%",
-        ]
+        weight_f = record.metrics.weight_dist_front_pct
+        lines = [f"F:{weight_f:.0f}%  B:{100 - weight_f:.0f}%"]
         if record.metrics.knee_angle_left is not None:
             lines.append(f"L knee: {record.metrics.knee_angle_left:.0f} deg")
         if record.metrics.knee_angle_right is not None:
