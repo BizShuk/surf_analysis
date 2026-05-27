@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "surfanalysis"
+version = "0.1.0"
+description = "Biomechanical analysis of surfing video"
+requires-python = ">=3.11"
+dependencies = [
+    "mediapipe>=0.10.9",
+    "opencv-python>=4.9.0",
+    "numpy>=1.26",
+    "pydantic>=2.5",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.3",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+surf = "surfanalysis.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/surfanalysis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/surfanalysis/metrics"]
