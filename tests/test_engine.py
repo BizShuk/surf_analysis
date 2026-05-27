@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from surfanalysis.extraction.engine import PoseEngine, MockEngine
+from surfanalysis.extraction.engine import MockEngine, PoseEngine
 from surfanalysis.extraction.schema import Keypoints
 
 

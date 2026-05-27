@@ -1,12 +1,11 @@
-import math
 import numpy as np
 import pytest
 
 from surfanalysis.metrics.angles import (
-    compute_knee_angles,
     compute_elbow_angles,
-    compute_torso_lean,
+    compute_knee_angles,
     compute_shoulder_hip_diff,
+    compute_torso_lean,
 )
 
 

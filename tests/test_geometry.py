@@ -1,10 +1,12 @@
 import math
-import pytest
+
 import numpy as np
+import pytest
+
 from surfanalysis.metrics.geometry import (
-    midpoint,
-    distance,
     angle_at_vertex,
+    distance,
+    midpoint,
     project_onto_segment,
     wrap_to_180,
 )

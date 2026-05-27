@@ -2,13 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from surfanalysis.extraction.schema import (
-    Keypoints,
+    EngineInfo,
     FrameMetrics,
     FrameRecord,
+    Keypoints,
     SessionRecord,
-    SourceInfo,
-    EngineInfo,
     SessionSummary,
+    SourceInfo,
 )
 
 

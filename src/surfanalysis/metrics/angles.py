@@ -7,8 +7,18 @@ import math
 import numpy as np
 
 from surfanalysis.extraction.landmarks import (
-    L_ANKLE, L_ELBOW, L_HIP, L_KNEE, L_SHOULDER, L_WRIST,
-    R_ANKLE, R_ELBOW, R_HIP, R_KNEE, R_SHOULDER, R_WRIST,
+    L_ANKLE,
+    L_ELBOW,
+    L_HIP,
+    L_KNEE,
+    L_SHOULDER,
+    L_WRIST,
+    R_ANKLE,
+    R_ELBOW,
+    R_HIP,
+    R_KNEE,
+    R_SHOULDER,
+    R_WRIST,
     VISIBILITY_THRESHOLD,
 )
 from surfanalysis.metrics.geometry import angle_at_vertex, midpoint, wrap_to_180
