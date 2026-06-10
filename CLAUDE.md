@@ -45,3 +45,8 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - Multi-person tracking
 - Maneuver classification (cutback, bottom turn, aerial)
 - Surfboard detection
+
+## References
+
+- [video_format_decision.md](file:///Users/shuk/projects/surf_analysis/video_format_decision.md) — 影片格式決策 (Video Format Decision) 指南
+- [golang-replacement.md](file:///Users/shuk/projects/surf_analysis/plans/golang-replacement.md) — Go 語言替代可行性評估與衝浪分析實作日誌 (Go Replacement Feasibility Assessment and Implementation Log)
