@@ -52,6 +52,39 @@ def test_overlay_no_metrics_returns_unchanged():
     assert out.sum() == 0
 
 
+def test_overlay_angle_line_adds_pixels():
+    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+    record = _frame_record()
+    no_lean = record.model_copy(deep=True)
+    no_lean.metrics.torso_lean_deg = None
+    renderer = OverlayRenderer()
+    out_with = renderer.draw(blank.copy(), record)
+    out_without = renderer.draw(blank.copy(), no_lean)
+    assert out_with.sum() > out_without.sum()
+
+
+def test_overlay_weight_line_skipped_when_feet_hidden():
+    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+    record = _frame_record()
+    hidden = record.model_copy(deep=True)
+    pts = list(hidden.keypoints.points)
+    pts[31] = (pts[31][0], pts[31][1], pts[31][2], 0.1)
+    pts[32] = (pts[32][0], pts[32][1], pts[32][2], 0.1)
+    hidden.keypoints.points = pts
+    renderer = OverlayRenderer()
+    out_with = renderer.draw(blank.copy(), record)
+    out_without = renderer.draw(blank.copy(), hidden)
+    assert out_with.sum() > out_without.sum()
+
+
+def test_overlay_stance_swaps_weight_labels():
+    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+    record = _frame_record()
+    out_regular = OverlayRenderer(stance="regular").draw(blank.copy(), record)
+    out_goofy = OverlayRenderer(stance="goofy").draw(blank.copy(), record)
+    assert not np.array_equal(out_regular, out_goofy)
+
+
 def test_overlay_show_secondary_adds_more_text():
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     record = _frame_record()

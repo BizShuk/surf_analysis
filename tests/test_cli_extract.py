@@ -35,6 +35,17 @@ def test_extract_writes_valid_json(tiny_video: Path, tmp_path: Path):
     assert data["summary"]["frames_total"] == 15
 
 
+def test_extract_default_output_name_next_to_video(tiny_video: Path):
+    proc = subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "extract",
+         str(tiny_video), "--quiet"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    out = tiny_video.with_name("tiny.metrics.json")
+    assert out.exists()
+
+
 def test_extract_missing_file_returns_exit_1(tmp_path: Path):
     proc = subprocess.run(
         [sys.executable, "-m", "surfanalysis.cli", "extract",

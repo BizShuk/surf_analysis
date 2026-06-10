@@ -103,7 +103,7 @@ def cmd_render(args: argparse.Namespace) -> int:
     json_path = Path(args.metrics_json)
     out_path = (
         Path(args.output) if args.output
-        else video.with_name(f"{video.stem}_annotated.mp4")
+        else video.with_name(f"{video.stem}.annotated{video.suffix}")
     )
 
     if not video.exists():
@@ -135,8 +135,11 @@ def cmd_render(args: argparse.Namespace) -> int:
     renderer = OverlayRenderer(
         skeleton_color=args.skeleton_color,
         com_color=args.com_color,
+        angle_color=args.angle_color,
+        weight_color=args.weight_color,
         font_scale=args.font_scale,
         show_secondary=args.show_secondary,
+        stance=session.stance,
     )
 
     progress = None if args.quiet else tqdm(total=len(session.frames), unit="frame")
@@ -184,6 +187,8 @@ def _build_parser() -> argparse.ArgumentParser:
     r.add_argument("--font-scale", type=float, default=0.6)
     r.add_argument("--skeleton-color", type=str, default="#00FF00")
     r.add_argument("--com-color", type=str, default="#FFFF00")
+    r.add_argument("--angle-color", type=str, default="#FF40FF")
+    r.add_argument("--weight-color", type=str, default="#FFA500")
     r.add_argument("--quiet", action="store_true")
     r.set_defaults(func=cmd_render)
 

@@ -39,6 +39,19 @@ def test_render_produces_output_video(tiny_video_and_json, tmp_path: Path):
     assert out.stat().st_size > 0
 
 
+def test_render_default_output_name_next_to_video(tiny_video_and_json):
+    video, jpath = tiny_video_and_json
+    proc = subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "render",
+         str(video), str(jpath), "--quiet"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    out = video.with_name("tiny.annotated.mp4")
+    assert out.exists()
+    assert out.stat().st_size > 0
+
+
 def test_render_rejects_unknown_schema_version(tiny_video_and_json, tmp_path: Path):
     video, jpath = tiny_video_and_json
     data = json.loads(jpath.read_text())

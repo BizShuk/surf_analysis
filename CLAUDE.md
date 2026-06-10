@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe Pose and emits `metrics.json`; `render` overlays skeleton + CoM + numbers onto the video.
+Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe Pose and emits `metrics.json`; `render` overlays skeleton + CoM + torso-lean angle line + foot-to-foot weight-distribution line + numbers onto the video.
 
 ## Structure
 
@@ -16,6 +16,14 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - Python 3.11+, MediaPipe Pose (default `model_complexity=1`), OpenCV for I/O and drawing, Pydantic v2 for schema
 - Two stages decoupled by JSON contract (`schema_version="1.0"`)
 - Strategy pattern on `PoseEngine` for future RTMPose / YOLO-pose swap
+
+## Run
+
+- `surf extract <video> [--stance regular|goofy]` → `<file_name>.metrics.json` next to the video
+- `surf render <video> <metrics.json>` → `<file_name>.annotated.<file_extension>` next to the video
+- Default output naming is a contract covered by tests in `test_cli_extract.py` / `test_cli_render.py`; `-o` overrides
+- Small/distant subjects: `--model-complexity 2 --min-confidence 0.3`
+- Without activated venv: `.venv/bin/python -m surfanalysis.cli <subcommand> ...`
 
 ## Build / test
 

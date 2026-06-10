@@ -13,3 +13,5 @@ build/
 !tests/fixtures/*.mp4
 *.metrics.json
 .DS_Store
+sample/copy_E3E271C2-C97A-485C-A388-8CB019F01603.annotated.MOV
+sample/copy_E3E271C2-C97A-485C-A388-8CB019F01603.MOV
