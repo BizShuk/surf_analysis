@@ -23,9 +23,9 @@ surf render surf_session.mp4 surf_session.metrics.json --show-secondary
 
 Outputs are written next to the input video:
 
-| Command | Default output |
-|---|---|
-| `surf extract clip.MOV` | `clip.metrics.json` |
+| Command                                  | Default output       |
+| ---------------------------------------- | -------------------- |
+| `surf extract clip.MOV`                  | `clip.metrics.json`  |
 | `surf render clip.MOV clip.metrics.json` | `clip.annotated.MOV` |
 
 Override either path with `-o/--output`. For small or distant subjects (e.g. wave-pool footage shot from the deck), `--model-complexity 2 --min-confidence 0.3` improves detection. Running without an activated venv also works: `.venv/bin/python -m surfanalysis.cli extract ...`.
