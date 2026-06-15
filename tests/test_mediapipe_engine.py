@@ -19,3 +19,15 @@ def test_mediapipe_engine_info_includes_params():
     assert info.name == "mediapipe"
     assert info.params["model_complexity"] == 1
     engine.close()
+
+
+def test_mediapipe_engine_tolerates_non_increasing_timestamps():
+    # VIDEO-mode detect_for_video requires strictly increasing timestamps and
+    # raises otherwise; the engine's monotonic clamp must absorb repeats/regress.
+    pytest.importorskip("mediapipe")
+    engine = MediaPipeEngine(model_complexity=0, min_detection_confidence=0.5)
+    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+    assert engine.detect(blank, timestamp_ms=100.0) is None
+    assert engine.detect(blank, timestamp_ms=100.0) is None  # repeat
+    assert engine.detect(blank, timestamp_ms=50.0) is None   # regress
+    engine.close()

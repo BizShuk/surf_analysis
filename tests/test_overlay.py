@@ -52,6 +52,19 @@ def test_overlay_no_metrics_returns_unchanged():
     assert out.sum() == 0
 
 
+def test_overlay_draws_skeleton_without_metrics():
+    # A pose can be detected on a frame where derived metrics (CoM / weight)
+    # could not be computed. The skeleton must still render so the movement
+    # annotation stays continuous instead of flickering off.
+    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+    record = _frame_record()
+    no_metrics = FrameRecord(
+        frame_index=0, timestamp_ms=0.0, keypoints=record.keypoints, metrics=None
+    )
+    out = OverlayRenderer().draw(blank, no_metrics)
+    assert out.sum() > 0  # skeleton edges drawn despite metrics=None
+
+
 def test_overlay_angle_line_adds_pixels():
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     record = _frame_record()

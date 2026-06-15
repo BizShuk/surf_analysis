@@ -39,7 +39,7 @@ class FrameAnalyzer:
 
         for idx, frame in enumerate(frames_iter):
             ts_ms = (idx / self._source.fps) * 1000.0 if self._source.fps > 0 else 0.0
-            kp = self._engine.detect(frame)
+            kp = self._engine.detect(frame, ts_ms)
             if kp is None:
                 stability.push(None)
                 frames.append(FrameRecord(frame_index=idx, timestamp_ms=ts_ms,

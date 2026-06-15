@@ -16,6 +16,19 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - Python 3.11+, MediaPipe Pose (default `model_complexity=1`), OpenCV for I/O and drawing, Pydantic v2 for schema
 - Two stages decoupled by JSON contract (`schema_version="1.0"`)
 - Strategy pattern on `PoseEngine` for future RTMPose / YOLO-pose swap
+- MediaPipe Pose 必須跑在 `VisionTaskRunningMode.VIDEO` + `detect_for_video()`（非 `IMAGE`）。
+    - `IMAGE` 模式逐幀重偵測、無時序追蹤，且忽略 `min_tracking_confidence`，導致小/快速移動主體標註閃爍（sample 實測：偵測率 49.6%、114 次 on/off）。
+    - `VIDEO` 模式以前一幀姿態當追蹤先驗，跨越短暫漏偵（同樣 sample：94.5%、6 次 on/off）。
+    - `detect_for_video` 要求嚴格遞增的整數毫秒 timestamp；引擎內建單調守衛（`ts <= last → last+1`）吸收重複/回退的時間戳。
+    - `PoseEngine.detect(frame, timestamp_ms)` 契約已加 `timestamp_ms` 參數，由 `FrameAnalyzer` 傳入。
+- 渲染分層：骨架（偵測證據）與衍生指標（CoM/重心分布）解耦。
+    - `overlay.draw()` 只要有 keypoints 就畫骨架；CoM、重心線、傾角線、文字才 gate 在 `metrics is None`。
+    - 避免某隻腳 visibility < 0.5 造成整幀標註消失。
+
+兩個重點摘要關係：
+
+- 抽取層 (mediapipe_engine.py) — IMAGE → VIDEO，解決偵測閃爍
+- 渲染層 (overlay.py) — 骨架/指標解耦，解決偵測到卻不畫的空窗
 
 ## Run
 

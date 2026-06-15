@@ -27,6 +27,8 @@ class MediaPipeEngine(PoseEngine):
             "min_detection_confidence": min_detection_confidence,
             "min_tracking_confidence": min_tracking_confidence,
         }
+        # Monotonic timestamp guard for VIDEO mode (see detect()).
+        self._last_ts_ms = -1
         model_path = os.environ.get(
             "MEDIAPIPE_MODEL_PATH",
             "/Users/shuk/.mediapipe/pose_landmarker.task",
@@ -34,17 +36,27 @@ class MediaPipeEngine(PoseEngine):
         base_options = BaseOptions(model_asset_path=model_path)
         options = PoseLandmarkerOptions(
             base_options=base_options,
-            running_mode=VisionTaskRunningMode.IMAGE,
+            # VIDEO mode keeps a tracking prior across frames so the pose
+            # carries over momentary detection dropouts. IMAGE mode re-detects
+            # each frame from scratch and ignores min_tracking_confidence,
+            # producing on/off flicker on small/fast-moving subjects.
+            running_mode=VisionTaskRunningMode.VIDEO,
             num_poses=1,
             min_pose_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
         )
         self._pose = PoseLandmarker.create_from_options(options)
 
-    def detect(self, frame: np.ndarray) -> Keypoints | None:
+    def detect(self, frame: np.ndarray, timestamp_ms: float = 0.0) -> Keypoints | None:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result = self._pose.detect(mp_image)
+        # detect_for_video requires strictly increasing integer ms timestamps;
+        # clamp upward if the source ever repeats or regresses a timestamp.
+        ts = int(timestamp_ms)
+        if ts <= self._last_ts_ms:
+            ts = self._last_ts_ms + 1
+        self._last_ts_ms = ts
+        result = self._pose.detect_for_video(mp_image, ts)
         if result.pose_landmarks is None or len(result.pose_landmarks) == 0:
             return None
         h, w = frame.shape[:2]

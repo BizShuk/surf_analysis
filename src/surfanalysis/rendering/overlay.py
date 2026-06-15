@@ -137,18 +137,27 @@ class OverlayRenderer:
         self._text(frame, f"B {100 - front_pct:.0f}%", (bx - 30, by + 24), self._wt)
 
     def draw(self, frame: np.ndarray, record: FrameRecord) -> np.ndarray:
-        if record.keypoints is None or record.metrics is None:
+        if record.keypoints is None:
             return frame
         h, w = frame.shape[:2]
         pts = [(int(p[0] * w), int(p[1] * h), p[3]) for p in record.keypoints.points]
 
-        # skeleton
+        # skeleton — drawn whenever a pose is detected. Each edge has its own
+        # visibility guard, so this is independent of whether the derived
+        # metrics (CoM / weight distribution) could be computed this frame.
+        # Keeping it decoupled stops the overlay vanishing on frames where, e.g.,
+        # a foot drops below the visibility threshold but the body is tracked.
         for a, b in SKELETON_EDGES:
             xa, ya, va = pts[a]
             xb, yb, vb = pts[b]
             if va < VISIBILITY_DRAW or vb < VISIBILITY_DRAW:
                 continue
             cv2.line(frame, (xa, ya), (xb, yb), self._sk, 2)
+
+        # Metric-dependent overlays (CoM marker, weight line, lean line, text)
+        # only render on frames that produced a full FrameMetrics.
+        if record.metrics is None:
+            return frame
 
         cx = int(record.metrics.com[0] * w)
         cy = int(record.metrics.com[1] * h)

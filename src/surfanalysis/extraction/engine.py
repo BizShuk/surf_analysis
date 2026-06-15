@@ -11,8 +11,13 @@ from surfanalysis.extraction.schema import EngineInfo, Keypoints
 
 class PoseEngine(ABC):
     @abstractmethod
-    def detect(self, frame: np.ndarray) -> Keypoints | None:
-        """Return keypoints for a BGR frame, or None if no person detected."""
+    def detect(self, frame: np.ndarray, timestamp_ms: float = 0.0) -> Keypoints | None:
+        """Return keypoints for a BGR frame, or None if no person detected.
+
+        ``timestamp_ms`` is the frame's position in the source video. Engines
+        with temporal tracking (e.g. MediaPipe VIDEO mode) use it to maintain
+        pose continuity across frames; stateless engines may ignore it.
+        """
 
     @abstractmethod
     def info(self) -> EngineInfo:
@@ -26,7 +31,7 @@ class MockEngine(PoseEngine):
         self._sequence = sequence
         self._cursor = 0
 
-    def detect(self, frame: np.ndarray) -> Keypoints | None:  # noqa: ARG002
+    def detect(self, frame: np.ndarray, timestamp_ms: float = 0.0) -> Keypoints | None:  # noqa: ARG002
         if self._cursor >= len(self._sequence):
             return None
         out = self._sequence[self._cursor]
