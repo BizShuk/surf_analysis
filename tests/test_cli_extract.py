@@ -53,3 +53,31 @@ def test_extract_missing_file_returns_exit_1(tmp_path: Path):
         capture_output=True, text=True,
     )
     assert proc.returncode == 1
+
+
+def test_extract_wave_adds_wave_fields(tiny_video: Path, tmp_path: Path):
+    out_json = tmp_path / "out.metrics.json"
+    proc = subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "extract",
+         str(tiny_video), "-o", str(out_json), "--wave",
+         "--wave-engine", "static", "--view", "facing", "--quiet"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    data = json.loads(out_json.read_text())
+    assert data["schema_version"] == "1.1"
+    assert "wave" in data["frames"][0]          # key present (value may be null)
+    assert data["wave_engine"]["name"] == "wave-static"
+
+
+def test_extract_without_wave_unchanged(tiny_video: Path, tmp_path: Path):
+    out_json = tmp_path / "out.metrics.json"
+    proc = subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "extract",
+         str(tiny_video), "-o", str(out_json), "--quiet"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    data = json.loads(out_json.read_text())
+    assert data["schema_version"] == "1.0"
+    assert data["wave_summary"] is None

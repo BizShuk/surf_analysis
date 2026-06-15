@@ -52,6 +52,27 @@ def _iter_frames(cap: cv2.VideoCapture, max_frames: int | None,
             break
 
 
+def _build_wave_engine(args: argparse.Namespace, cap: cv2.VideoCapture):
+    from surfanalysis.extraction.wave import make_wave_engine
+    from surfanalysis.extraction.wave.prescan import prescan
+
+    engine_name, view = args.wave_engine, args.view
+    if engine_name == "auto" or view == "auto":
+        sample: list[np.ndarray] = []
+        for _ in range(15):
+            ok, fr = cap.read()
+            if not ok:
+                break
+            sample.append(fr)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        pe, pv = prescan(sample)
+        if engine_name == "auto":
+            engine_name = pe
+        if view == "auto":
+            view = pv
+    return make_wave_engine(engine_name, view, args.min_confidence)
+
+
 def cmd_extract(args: argparse.Namespace) -> int:
     video = Path(args.video)
     out_path = Path(args.output) if args.output else video.with_suffix(".metrics.json")
@@ -74,11 +95,22 @@ def cmd_extract(args: argparse.Namespace) -> int:
         cap.release()
         return EXIT_ENGINE
 
+    wave_engine = None
+    if args.wave:
+        try:
+            wave_engine = _build_wave_engine(args, cap)
+        except Exception as e:
+            print(f"error: wave engine init failed: {e}", file=sys.stderr)
+            cap.release()
+            engine.close()
+            return EXIT_ENGINE
+
     if not args.quiet:
         print(f"[INFO] {source.width}x{source.height}, {source.fps:.2f} fps, "
               f"{source.total_frames} frames")
 
-    analyzer = FrameAnalyzer(engine=engine, stance=args.stance, source=source)
+    analyzer = FrameAnalyzer(engine=engine, stance=args.stance, source=source,
+                             wave_engine=wave_engine)
     progress = None if args.quiet else tqdm(total=source.total_frames, unit="frame")
     try:
         session = analyzer.run(_iter_frames(cap, args.max_frames, progress))
@@ -87,6 +119,8 @@ def cmd_extract(args: argparse.Namespace) -> int:
             progress.close()
         cap.release()
         engine.close()
+        if wave_engine is not None:
+            wave_engine.close()
 
     out_path.write_text(session.model_dump_json(indent=2))
     if not args.quiet:
@@ -175,6 +209,9 @@ def _build_parser() -> argparse.ArgumentParser:
     e.add_argument("--model-complexity", type=int, choices=[0, 1, 2], default=1)
     e.add_argument("--min-confidence", type=float, default=0.5)
     e.add_argument("--max-frames", type=int, default=None)
+    e.add_argument("--wave", action="store_true")
+    e.add_argument("--wave-engine", choices=["auto", "ocean", "static"], default="auto")
+    e.add_argument("--view", choices=["auto", "facing", "side"], default="auto")
     e.add_argument("--quiet", action="store_true")
     e.set_defaults(func=cmd_extract)
 
