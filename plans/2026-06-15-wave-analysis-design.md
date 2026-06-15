@@ -37,7 +37,7 @@ schema_version: 1.1
 
 浪面分析沿用 repo 既有的隔離原則，並與 pose pipeline `平行` 而非耦合：
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────┐
 │                         CLI (argparse)                           │
 │   surf extract <video> [--wave] [--wave-engine auto] [--view auto]│
@@ -199,7 +199,7 @@ class WaveSummary(BaseModel):              # session
 | facing（正對） | 浪唇線傾斜（浪肩坡向/peel 方向） | `crest_tilt`     | 橫跨畫面的 crest/lip 線          | 垂直括號 crest→base 的垂直延伸 / 幀高 |
 | side（側拍）   | 浪面剖面陡度 (steepness)         | `face_steepness` | 一條斜的浪面剖面線(trough→crest) | 同剖面線的垂直投影 / 幀高             |
 
-```
+```text
 facing（正對浪）— sample 即此種
    ~~~~~ 浪唇 crest line ~~~~~     ← angle_line：tilt vs horizon
    /      (foam 頂緣)      \
@@ -219,7 +219,7 @@ side（側拍剖面）
 
 `量法公式 (metrics/wave_geometry.py，純函數)`
 
-```
+```text
 # 角度一律相對地平線（吸收攝影機 roll）。h = horizon 傾角(度)
 crest_tilt_deg(angle_line, h)     = wrap_to_180(line_angle(angle_line) - h)
 face_steepness_deg(angle_line, h) = wrap_to_180(line_angle(angle_line) - h)
@@ -256,7 +256,7 @@ class WaveEngine(ABC):
 
 `兩個引擎`
 
-```
+```text
 ocean: HorizonAnchoredWaveEngine（每幀、不受攝影機運動影響）
   detect_horizon → 水域 ROI(地平線下方)
   → 白沫帶(高 V 低 S) + 浪面紋理/梯度 分割
@@ -274,7 +274,7 @@ static: Mog2WaveEngine（固定機位、造浪池）
 
 `pipeline 整合 (analyzer.py)`
 
-```
+```text
 FrameAnalyzer(engine: PoseEngine, stance, source, wave_engine: WaveEngine | None = None)
 
 run(frames):
@@ -294,7 +294,7 @@ run(frames):
 
 `WaveOverlay` 與 pose overlay 完全解耦，於 `cmd_render` 分開呼叫：
 
-```
+```text
 for record in frames:
     frame = renderer.draw(frame, record)        # pose（既有，keypoints None 時早退）
     frame = wave_overlay.draw(frame, record)    # wave（獨立，不受 keypoints 影響）
@@ -309,7 +309,7 @@ for record in frames:
 
 `數值顯示規則`（對齊既有 lean/weight 標籤慣例）
 
-```
+```text
 左上 pose(既有)        右上 wave HUD
 F:60% B:40%           wave H 0.42       ← 即時值(EMA 平滑)
 lean:+3 deg           tilt +8 deg       ← facing 顯示 tilt / side 顯示 face
@@ -327,7 +327,7 @@ lean:+3 deg           tilt +8 deg       ← facing 顯示 tilt / side 顯示 fac
 
 `extract subcommand（新增）`
 
-```
+```text
 options:
   --wave                           啟用浪面偵測 (default: 關，保持現有行為與效能不變)
   --wave-engine {auto,ocean,static}  浪面引擎 (default: auto)
@@ -336,7 +336,7 @@ options:
 
 `render subcommand（新增）`
 
-```
+```text
 options:
   --show-wave / --no-wave          畫浪面標註 (default: 有 wave 資料就畫)
   --wave-color HEX                 浪面線顏色 (default: 例如 #00E5FF 青)
@@ -353,7 +353,7 @@ options:
 
 沿用 repo 高覆蓋 TDD 風格，於既有測試上加「視角」維度。
 
-```
+```text
 test_wave_geometry.py   純函數：合成 crest/base+horizon → crest_tilt/face_steepness；
                         normalized_height；classify_view（facing vs side 合成輸入）；
                         aggregate_wave 的 median/p90/mixed；None 處理

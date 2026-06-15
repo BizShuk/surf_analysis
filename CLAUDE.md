@@ -6,9 +6,10 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 
 ## Structure
 
-- `metrics/` — pure functions, mypy strict required, no I/O
+- `metrics/` — pure functions, mypy strict required, no I/O (incl. `wave_geometry.py`)
 - `extraction/` — PoseEngine (ABC + MediaPipe impl), FrameAnalyzer, Pydantic schema
-- `rendering/` — overlay + video writer; depends only on schema
+- `extraction/wave/` — WaveEngine (ABC + `ocean`/`static` impls), horizon/motion/region helpers, pre-scan (engine+view auto-select)
+- `rendering/` — overlay + video writer; depends only on schema (`wave_overlay.py` decoupled from pose overlay)
 - `cli.py` — argparse subcommands; no business logic
 
 ## Tech decisions
@@ -36,6 +37,9 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - `surf render <video> <metrics.json>` → `<file_name>.annotated.<file_extension>` next to the video
 - Default output naming is a contract covered by tests in `test_cli_extract.py` / `test_cli_render.py`; `-o` overrides
 - Small/distant subjects: `--model-complexity 2 --min-confidence 0.3`
+- Wave analysis (optional): `surf extract <video> --wave [--wave-engine auto|ocean|static] [--view auto|facing|side]` adds normalized `wave` per frame + `wave_summary`, and bumps `schema_version` to `1.1` (render still reads `1.0`). `surf render` draws it unless `--no-wave`.
+    - Wave metrics 與 pose 完全解耦（歸一化、不碰人體關鍵點）。`facing` 量浪唇傾斜 (`crest_tilt`)、`side` 量浪面陡度 (`face_steepness`)，由 `angle_kind` 標明語意。
+    - 實測 (sample.MOV 靜止造浪)：`auto` 會選 `static`(MOG2)，但 MOG2 會把「穩定的造浪水流」學進背景而漏偵（偵測率 ~15%）。`--wave-engine ocean`（顏色/泡沫法）在同片偵測率 100% 且 crest 追蹤良好。`靜止造浪池建議明確用 ocean 引擎`；MOG2 適合「固定機位 + 短暫前景」的真實海浪岸拍。
 - Without activated venv: `.venv/bin/python -m surfanalysis.cli <subcommand> ...`
 
 ## Build / test
