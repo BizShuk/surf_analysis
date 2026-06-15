@@ -63,3 +63,27 @@ def test_render_rejects_unknown_schema_version(tiny_video_and_json, tmp_path: Pa
         capture_output=True, text=True,
     )
     assert proc.returncode == 4
+
+
+def test_render_accepts_schema_1_1_with_wave(tmp_path: Path):
+    video = tmp_path / "tiny.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(video), fourcc, 15.0, (320, 240))
+    for _ in range(15):
+        writer.write(np.full((240, 320, 3), 80, dtype=np.uint8))
+    writer.release()
+
+    jpath = tmp_path / "tiny.metrics.json"
+    subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "extract", str(video),
+         "-o", str(jpath), "--wave", "--wave-engine", "static", "--quiet"],
+        check=True,
+    )
+    out = tmp_path / "out.mp4"
+    proc = subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "render", str(video),
+         str(jpath), "-o", str(out), "--quiet"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert out.exists() and out.stat().st_size > 0

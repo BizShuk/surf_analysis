@@ -131,6 +131,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
 
 def cmd_render(args: argparse.Namespace) -> int:
     from surfanalysis.rendering.overlay import OverlayRenderer
+    from surfanalysis.rendering.wave_overlay import WaveOverlay
     from surfanalysis.rendering.writer import VideoSink
 
     video = Path(args.video)
@@ -153,7 +154,7 @@ def cmd_render(args: argparse.Namespace) -> int:
         print(f"error: invalid metrics json: {e}", file=sys.stderr)
         return EXIT_SCHEMA
 
-    if session.schema_version != "1.0":
+    if session.schema_version.split(".")[0] != "1":
         print(f"error: unsupported schema_version {session.schema_version}",
               file=sys.stderr)
         return EXIT_SCHEMA
@@ -175,6 +176,11 @@ def cmd_render(args: argparse.Namespace) -> int:
         show_secondary=args.show_secondary,
         stance=session.stance,
     )
+    wave_overlay = WaveOverlay(
+        color=args.wave_color,
+        font_scale=args.font_scale,
+        height_pct=args.wave_height_pct,
+    ) if args.show_wave else None
 
     progress = None if args.quiet else tqdm(total=len(session.frames), unit="frame")
     try:
@@ -182,7 +188,10 @@ def cmd_render(args: argparse.Namespace) -> int:
             ok, frame = cap.read()
             if not ok:
                 break
-            sink.write(renderer.draw(frame, record))
+            frame = renderer.draw(frame, record)
+            if wave_overlay is not None:
+                frame = wave_overlay.draw(frame, record)
+            sink.write(frame)
             if progress is not None:
                 progress.update(1)
     finally:
@@ -226,6 +235,10 @@ def _build_parser() -> argparse.ArgumentParser:
     r.add_argument("--com-color", type=str, default="#FFFF00")
     r.add_argument("--angle-color", type=str, default="#FF40FF")
     r.add_argument("--weight-color", type=str, default="#FFA500")
+    r.add_argument("--show-wave", action="store_true", default=True)
+    r.add_argument("--no-wave", dest="show_wave", action="store_false")
+    r.add_argument("--wave-color", type=str, default="#00E5FF")
+    r.add_argument("--wave-height-pct", action="store_true")
     r.add_argument("--quiet", action="store_true")
     r.set_defaults(func=cmd_render)
 
