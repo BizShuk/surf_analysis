@@ -6,6 +6,11 @@ import pytest
 from surfanalysis.extraction.analyzer import FrameAnalyzer
 from surfanalysis.extraction.engine import MockEngine
 from surfanalysis.extraction.schema import Keypoints, SourceInfo
+from surfanalysis.extraction.wave.base import (
+    MockWaveEngine,
+    WaveObservation,
+    to_wave_metrics,
+)
 
 
 def _placed_kp():
@@ -50,3 +55,39 @@ def test_analyzer_writes_json(tmp_path: Path):
     session = analyzer.run(frames_iter=iter([np.zeros((480, 640, 3), dtype=np.uint8)]))
     out.write_text(session.model_dump_json(indent=2))
     assert out.read_text().startswith('{')
+
+
+def _wave_metrics():
+    obs = WaveObservation(
+        crest=(0.5, 0.3), base=(0.5, 0.7),
+        crest_line=((0.1, 0.30), (0.9, 0.28)),
+        face_line=((0.5, 0.7), (0.5, 0.3)),
+        bbox=(0.1, 0.28, 0.8, 0.42), confidence=0.8, horizon_deg=0.0,
+    )
+    return to_wave_metrics(obs, "facing")
+
+
+def test_analyzer_populates_wave_and_summary():
+    src = SourceInfo(path="x.mp4", width=640, height=480, fps=30.0,
+                     total_frames=2, duration_ms=66.0)
+    engine = MockEngine(sequence=[_placed_kp(), _placed_kp()])
+    wave = MockWaveEngine([_wave_metrics(), None])
+    analyzer = FrameAnalyzer(engine=engine, stance="regular", source=src, wave_engine=wave)
+    frames = [np.zeros((480, 640, 3), dtype=np.uint8) for _ in range(2)]
+    session = analyzer.run(frames_iter=iter(frames))
+
+    assert session.schema_version == "1.1"
+    assert session.frames[0].wave is not None
+    assert session.frames[1].wave is None
+    assert session.wave_summary is not None
+    assert session.wave_summary.frames_detected == 1
+    assert session.wave_engine.name == "mock-wave"
+
+
+def test_analyzer_without_wave_engine_stays_v1_0():
+    src = SourceInfo(path="x.mp4", width=640, height=480, fps=30.0,
+                     total_frames=1, duration_ms=33.0)
+    analyzer = FrameAnalyzer(engine=MockEngine([_placed_kp()]), stance="regular", source=src)
+    session = analyzer.run(frames_iter=iter([np.zeros((480, 640, 3), dtype=np.uint8)]))
+    assert session.schema_version == "1.0"
+    assert session.wave_summary is None
