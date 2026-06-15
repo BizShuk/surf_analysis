@@ -8,7 +8,8 @@ import numpy as np
 
 
 def midpoint(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return (a + b) / 2.0
+    mid: np.ndarray = (a + b) / 2.0
+    return mid
 
 
 def distance(a: np.ndarray, b: np.ndarray) -> float:

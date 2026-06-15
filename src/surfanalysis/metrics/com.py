@@ -35,7 +35,8 @@ def _point_if_visible(kp: np.ndarray, i: int) -> np.ndarray | None:
 def _midpoint_if_both_visible(kp: np.ndarray, a: int, b: int) -> np.ndarray | None:
     if kp[a, 3] < VISIBILITY_THRESHOLD or kp[b, 3] < VISIBILITY_THRESHOLD:
         return None
-    return (kp[a, :2] + kp[b, :2]) / 2.0
+    mid: np.ndarray = (kp[a, :2] + kp[b, :2]) / 2.0
+    return mid
 
 
 def _trunk_centroid(kp: np.ndarray) -> np.ndarray | None:
@@ -45,7 +46,8 @@ def _trunk_centroid(kp: np.ndarray) -> np.ndarray | None:
                if kp[i, 3] >= VISIBILITY_THRESHOLD]
     if len(visible) < 3:
         return None
-    return np.mean(visible, axis=0)
+    centroid: np.ndarray = np.mean(visible, axis=0)
+    return centroid
 
 
 def compute_com(kp: np.ndarray) -> tuple[float, float] | None:
