@@ -9,6 +9,8 @@ from surfanalysis.extraction.schema import (
     SessionRecord,
     SessionSummary,
     SourceInfo,
+    WaveMetrics,
+    WaveSummary,  # noqa: F401
 )
 
 
@@ -60,3 +62,47 @@ def test_stance_must_be_regular_or_goofy():
     with pytest.raises(ValidationError):
         SessionRecord(schema_version="1.0", source=src, engine=eng,
                       stance="sideways", frames=[], summary=summary)
+
+
+def _wave():
+    return WaveMetrics(
+        view="facing", height=0.42, angle_deg=8.3, angle_kind="crest_tilt",
+        confidence=0.74, angle_line=((0.18, 0.31), (0.86, 0.27)),
+        height_top=(0.52, 0.29), height_bottom=(0.52, 0.71), horizon_deg=-1.2,
+    )
+
+
+def test_wave_metrics_round_trip():
+    w = _wave()
+    restored = WaveMetrics.model_validate_json(w.model_dump_json())
+    assert restored.view == "facing"
+    assert restored.angle_kind == "crest_tilt"
+    assert restored.angle_line[0] == (0.18, 0.31)
+
+
+def test_wave_view_must_be_valid():
+    with pytest.raises(ValidationError):
+        WaveMetrics(
+            view="overhead", height=0.4, angle_deg=0.0, angle_kind="crest_tilt",
+            confidence=0.5, angle_line=((0.0, 0.0), (1.0, 0.0)),
+            height_top=(0.5, 0.1), height_bottom=(0.5, 0.9),
+        )
+
+
+def test_frame_record_wave_defaults_none():
+    fr = FrameRecord(frame_index=0, timestamp_ms=0.0, keypoints=None, metrics=None)
+    assert fr.wave is None
+
+
+def test_session_record_back_compat_v1_0_without_wave():
+    src = SourceInfo(path="x.mp4", width=1, height=1, fps=1.0,
+                     total_frames=0, duration_ms=0.0)
+    eng = EngineInfo(name="mediapipe", version="x", params={})
+    summary = SessionSummary(frames_with_detection=0, frames_total=0,
+                             detection_rate=0.0, metrics_aggregate={})
+    s = SessionRecord(schema_version="1.0", source=src, engine=eng,
+                      stance="regular", frames=[], summary=summary)
+    assert s.wave_engine is None
+    assert s.wave_summary is None
+    restored = SessionRecord.model_validate_json(s.model_dump_json())
+    assert restored.wave_summary is None

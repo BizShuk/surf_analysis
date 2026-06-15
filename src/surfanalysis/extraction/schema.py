@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 Stance = Literal["regular", "goofy"]
+WaveView = Literal["facing", "side"]
+AngleKind = Literal["crest_tilt", "face_steepness"]
 
 
 class SourceInfo(BaseModel):
@@ -48,11 +50,33 @@ class FrameMetrics(BaseModel):
     com_stability_score: float | None = None
 
 
+class WaveMetrics(BaseModel):
+    view: WaveView
+    height: float
+    angle_deg: float
+    angle_kind: AngleKind
+    confidence: float
+    angle_line: tuple[tuple[float, float], tuple[float, float]]
+    height_top: tuple[float, float]
+    height_bottom: tuple[float, float]
+    horizon_deg: float | None = None
+
+
+class WaveSummary(BaseModel):
+    frames_detected: int
+    view: WaveView | Literal["mixed"]
+    height_median: float
+    height_p90: float
+    angle_median: float
+    engine: str
+
+
 class FrameRecord(BaseModel):
     frame_index: int
     timestamp_ms: float
     keypoints: Keypoints | None
     metrics: FrameMetrics | None
+    wave: WaveMetrics | None = None
 
 
 class SessionSummary(BaseModel):
@@ -69,3 +93,5 @@ class SessionRecord(BaseModel):
     stance: Stance
     frames: list[FrameRecord]
     summary: SessionSummary
+    wave_engine: EngineInfo | None = None
+    wave_summary: WaveSummary | None = None
