@@ -76,7 +76,7 @@ schema_version: 1.1
 
 `新增/變更檔案`
 
-```
+```tree
 src/surfanalysis/
 ├── extraction/
 │   ├── wave/                      ← 新增子套件（每引擎一檔，保持小而專注）
@@ -152,33 +152,39 @@ class WaveSummary(BaseModel):              # session
 
 ```json
 {
-  "schema_version": "1.1",
-  "wave_engine": { "name": "wave-ocean", "version": "0.1.0",
-                   "params": { "view": "facing", "min_confidence": 0.5 } },
-  "frames": [
-    {
-      "frame_index": 0,
-      "wave": {
+    "schema_version": "1.1",
+    "wave_engine": {
+        "name": "wave-ocean",
+        "version": "0.1.0",
+        "params": { "view": "facing", "min_confidence": 0.5 }
+    },
+    "frames": [
+        {
+            "frame_index": 0,
+            "wave": {
+                "view": "facing",
+                "height": 0.42,
+                "angle_deg": 8.3,
+                "angle_kind": "crest_tilt",
+                "confidence": 0.74,
+                "angle_line": [
+                    [0.18, 0.31],
+                    [0.86, 0.27]
+                ],
+                "height_top": [0.52, 0.29],
+                "height_bottom": [0.52, 0.71],
+                "horizon_deg": -1.2
+            }
+        }
+    ],
+    "wave_summary": {
+        "frames_detected": 690,
         "view": "facing",
-        "height": 0.42,
-        "angle_deg": 8.3,
-        "angle_kind": "crest_tilt",
-        "confidence": 0.74,
-        "angle_line": [[0.18, 0.31], [0.86, 0.27]],
-        "height_top": [0.52, 0.29],
-        "height_bottom": [0.52, 0.71],
-        "horizon_deg": -1.2
-      }
+        "height_median": 0.4,
+        "height_p90": 0.47,
+        "angle_median": 7.6,
+        "engine": "ocean"
     }
-  ],
-  "wave_summary": {
-    "frames_detected": 690,
-    "view": "facing",
-    "height_median": 0.40,
-    "height_p90": 0.47,
-    "angle_median": 7.6,
-    "engine": "ocean"
-  }
 }
 ```
 
@@ -188,10 +194,10 @@ class WaveSummary(BaseModel):              # session
 
 單機位下，浪面陡度沿攝影機光軸（深度）傾斜，無法從單張影像還原；因此 `facing` 與 `side` 量的是 `不同的物理量`，線的位置也不同。
 
-| view | 浪角 angle 量什麼 | angle_kind | angle_line 是哪條 | 浪高 height 怎麼量 |
-|---|---|---|---|---|
-| facing（正對） | 浪唇線傾斜（浪肩坡向/peel 方向） | `crest_tilt` | 橫跨畫面的 crest/lip 線 | 垂直括號 crest→base 的垂直延伸 / 幀高 |
-| side（側拍） | 浪面剖面陡度 (steepness) | `face_steepness` | 一條斜的浪面剖面線(trough→crest) | 同剖面線的垂直投影 / 幀高 |
+| view           | 浪角 angle 量什麼                | angle_kind       | angle_line 是哪條                | 浪高 height 怎麼量                    |
+| -------------- | -------------------------------- | ---------------- | -------------------------------- | ------------------------------------- |
+| facing（正對） | 浪唇線傾斜（浪肩坡向/peel 方向） | `crest_tilt`     | 橫跨畫面的 crest/lip 線          | 垂直括號 crest→base 的垂直延伸 / 幀高 |
+| side（側拍）   | 浪面剖面陡度 (steepness)         | `face_steepness` | 一條斜的浪面剖面線(trough→crest) | 同剖面線的垂直投影 / 幀高             |
 
 ```
 facing（正對浪）— sample 即此種
