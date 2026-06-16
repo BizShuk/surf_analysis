@@ -138,7 +138,7 @@ def cmd_render(args: argparse.Namespace) -> int:
     json_path = Path(args.metrics_json)
     out_path = (
         Path(args.output) if args.output
-        else video.with_name(f"{video.stem}.annotated{video.suffix}")
+        else video.with_name(f"{video.stem}.annotated.mp4")
     )
 
     if not video.exists():
