@@ -6,14 +6,14 @@
 
 本教學依「先觀念、再運作、後調校」順序，分為六節：
 
-| 節次 | 主題                                  | 你會學到                               |
-| ---- | ------------------------------------- | -------------------------------------- |
-| 1    | 背景知識 (Background)                 | 姿態估計、33 關鍵點、`visibility` 門檻 |
-| 2    | 系統如何運作 (How It Works)           | 兩階段管線、JSON 契約、模組關係        |
-| 3    | 指標數學原理 (The Metrics)            | CoM、配重、角度、穩定度的公式          |
-| 4    | 疊圖呈現 (Overlay)                    | render 畫了什麼、怎麼讀                |
-| 5    | 如何調校 (Tuning)                     | 各參數作用、常見情境配方               |
-| 6    | 解讀與擴充 (Interpreting & Extending) | 真實樣本陷阱、換 Engine                |
+| 節次 | 主題                                  | 你會學到                                |
+| ---- | ------------------------------------- | --------------------------------------- |
+| 1    | 背景知識 (Background)                 | 姿態估計、33 關鍵點、`visibility` 門檻  |
+| 2    | 系統如何運作 (How It Works)           | 兩階段管線、JSON 契約、模組關係         |
+| 3    | 指標數學原理 (The Metrics)            | CoM、配重、角度、穩定度的公式           |
+| 4    | 疊圖呈現 (Overlay)                    | render 畫了什麼、怎麼讀                 |
+| 5    | 如何調校 (Tuning)                     | 各參數作用、常見情境配方                |
+| 6    | 解讀與擴充 (Interpreting & Extending) | 真實樣本陷阱、換 Engine、自定義肢段比例 |
 
 > 對應原始碼：`src/surfanalysis/` 之下 `extraction/`、`metrics/`、`rendering/`、`cli.py`。本文所有公式與門檻皆直接引自程式碼，非泛論。
 
@@ -170,7 +170,7 @@ CoM = Σ(可見肢段中點 × 質量係數) / Σ(可見肢段的質量係數)
 - 但設了下限 `_MIN_PRESENT_MASS = 0.8`：若可見肢段加起來不到全身質量的 8 成，回 `None`（資訊太少不硬算）。
 - 軀幹質心 (`_trunk_centroid`) 需要肩、髖四點中至少 `3` 點可見才成立；軀幹占 0.497 是最重的一段，缺它幾乎必然觸發下限而回 `None`。
 
-> 全部係數加總約為 `0.988`（非 1.0）——因為頭只用鼻近似、手掌等末端被省略。這對「位置」估計無妨，因為最後是用「出現質量」正規化。
+> 全部係數加總約為 `0.988`（非 1.0）——因為頭只用鼻近似、手掌等末端被省略。這對「位置」估計無妨，因為最後是用「出現質量」正規化。（自定義肢段比例的詳細原理與實作擴充請參閱專門文件 [衝浪重心與自定義肢段比例指南](./custom-segment-weights)）
 
 ### 3.2 前後腳配重 (Weight Distribution)
 
@@ -331,7 +331,15 @@ flowchart LR
 
 只要你的 `detect()` 回傳同樣的 `Keypoints`（33 點、正規化、含 visibility），`metrics/` 與 `rendering/` 一行都不用改。測試時可用 `engine.py` 內建的 `MockEngine` 餵入固定序列驗證管線。
 
-### 6.3 延伸閱讀
+### 6.3 擴充：自定義肢段比例 (Custom Segment Proportions)
+
+除了更換姿態引擎外，系統也支援透過自定義的`肢段比例 (segment proportion)`來優化重心與配重的計算，這對於適應不同體型、性別或穿戴`防寒衣 (wetsuit)`的衝浪者特別有幫助。
+
+詳細的數學原理、動態遮擋補償機制、推薦的配置檔數值以及各模組的實作修改指引，請參閱專門的教學文件：
+
+- [衝浪重心與自定義肢段比例指南](file:///Users/shuk/projects/surf_analysis/docs/tutorials/custom-segment-weights.md)
+
+### 6.4 延伸閱讀
 
 - `CLAUDE.md` — 專案結構與技術決策
 - `plans/video_format_decision.md` — 影片格式 (Container / Codec) 決策指南
