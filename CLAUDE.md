@@ -31,6 +31,33 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - 抽取層 (mediapipe_engine.py) — IMAGE → VIDEO，解決偵測閃爍
 - 渲染層 (overlay.py) — 骨架/指標解耦，解決偵測到卻不畫的空窗
 
+## Wave height semantics
+
+現況：`wave_summary.height_median` / `height_p90` 是畫面占比（正規化 0-1），不是物理浪高。命名雖遵循全專案「座標存 0-1」慣例，但與 WSL / 氣象慣例的 `wave height in meters` 語意落差大、誤讀風險高。改用 `wave_height_m`（單位公尺）取代 `height_*` 為目標。
+
+不靠衝浪者當 reference scale 推算物理浪高的可行路徑（依推薦順序）：
+
+1. 相機幾何 + 已知架設高度（one-view metrology,推薦 baseline）
+    - 輸入：相機架設高度 `H`（已知）、焦距 `f`（EXIF / 設備規格）、`horizon_deg`（`horizon.py` 已能偵測）。
+    - 推算：對畫面 `y` 處的點，深度 `Z(y) = H / tan(θ + arctan((y − cy)/f))`、世界高 `Y(y) = Z(y)·(y − cy)/f`；`wave_height_m = |Y(crest) − Y(trough)|`。
+    - 適用：固定機位岸拍、堤防、空拍機。手持 / POV 不適用（`H` 與 `θ` 會隨相機抖動漂移）。
+2. 波長–週期色散（純物理）
+    - 深水重力波 `L = gT²/(2π)`；碎波 `H/L ≈ 1/7 ~ 1/10` (Miche 準則)。`L` 由 `ocean` 引擎 crest 軌跡間距推得；`T` 由 crest 通過定點的時序推得。
+    - 優點：完全不需要相機參數。缺點：`L` 影像 → 世界的轉換仍需方法 1 的相機幾學，或承受 ±20% 的影像 proxy 誤差。
+3. 場景已知物體
+    - 防鯊網浮球（標準 40–60 cm）、消波塊（2–4 m）、救生員瞭望台 / 旗桿（固定尺寸）。
+    - 適用：單一場域長期部署；不適用一般輸入。
+4. 結構自運動（SfM）
+    - 飄移空拍 / 船拍。COLMAP / OpenCV `stereoCalibrate` 路線。工程量最高。
+
+方法 1 + 2 可交叉驗證：一致 → `confidence: high`；分歧 → `confidence: low`。
+
+實作約束（與現有分層一致）：
+
+- 新公式放 `metrics/wave_geometry.py`（pure functions, mypy strict）。
+- I/O 與 `camera_height_m` / `focal_length_mm` 等輸入欄位放 `extraction/`；`prescan.py` 判斷能否計算,失敗時回 `wave_height_m: null` 而非丟誤導的 fraction。
+- `rendering/wave_overlay.py` 解耦性已存在,只需新增「物理高度」overlay 分支（顯示 `m` 單位 + 信心標記）。
+
 ## Run
 
 - `surf extract <video> [--stance regular|goofy]` → `<file_name>.metrics.json` next to the video
@@ -40,6 +67,7 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - Wave analysis (optional): `surf extract <video> --wave [--wave-engine auto|ocean|static] [--view auto|facing|side]` adds normalized `wave` per frame + `wave_summary`, and bumps `schema_version` to `1.1` (render still reads `1.0`). `surf render` draws it unless `--no-wave`.
     - Wave metrics 與 pose 完全解耦（歸一化、不碰人體關鍵點）。`facing` 量浪唇傾斜 (`crest_tilt`)、`side` 量浪面陡度 (`face_steepness`)，由 `angle_kind` 標明語意。
     - 實測 (sample.MOV 靜止造浪)：`auto` 會選 `static`(MOG2)，但 MOG2 會把「穩定的造浪水流」學進背景而漏偵（偵測率 ~15%）。`--wave-engine ocean`（顏色/泡沫法）在同片偵測率 100% 且 crest 追蹤良好。`靜止造浪池建議明確用 ocean 引擎`；MOG2 適合「固定機位 + 短暫前景」的真實海浪岸拍。
+    - ⚠ `wave_summary.height_median` / `height_p90` 目前是「畫面占比」（正規化 0-1），不是物理浪高（公尺）。命名遵循全專案「座標存 0-1」慣例，但易與 WSL / 氣象的 `wave height` 混淆；詳見下方「Wave height semantics」一節。
 - Without activated venv: `.venv/bin/python -m surfanalysis.cli <subcommand> ...`
 
 ## Build / test
