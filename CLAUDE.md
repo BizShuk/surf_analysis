@@ -64,10 +64,11 @@ Two-stage CLI for surfing video biomechanical analysis. `extract` runs MediaPipe
 - `surf render <video> <metrics.json>` → `<file_name>.annotated.<file_extension>` next to the video
 - Default output naming is a contract covered by tests in `test_cli_extract.py` / `test_cli_render.py`; `-o` overrides
 - Small/distant subjects: `--model-complexity 2 --min-confidence 0.3`
-- Wave analysis (optional): `surf extract <video> --wave [--wave-engine auto|ocean|static] [--view auto|facing|side]` adds normalized `wave` per frame + `wave_summary`, and bumps `schema_version` to `1.1` (render still reads `1.0`). `surf render` draws it unless `--no-wave`.
+- Wave analysis (optional): `surf extract <video> --wave [--wave-engine auto|ocean|static] [--view auto|facing|side]` adds per-frame `wave` + `wave_summary`, and bumps `schema_version` to `1.2` (render still reads `1.0` and `1.2`; **1.1 is rejected with `IncompatibleSchemaError`** per user decision 2026-06-21). `surf render` draws it unless `--no-wave`.
     - Wave metrics 與 pose 完全解耦（歸一化、不碰人體關鍵點）。`facing` 量浪唇傾斜 (`crest_tilt`)、`side` 量浪面陡度 (`face_steepness`)，由 `angle_kind` 標明語意。
     - 實測 (sample.MOV 靜止造浪)：`auto` 會選 `static`(MOG2)，但 MOG2 會把「穩定的造浪水流」學進背景而漏偵（偵測率 ~15%）。`--wave-engine ocean`（顏色/泡沫法）在同片偵測率 100% 且 crest 追蹤良好。`靜止造浪池建議明確用 ocean 引擎`；MOG2 適合「固定機位 + 短暫前景」的真實海浪岸拍。
-    - ⚠ `wave_summary.height_median` / `height_p90` 目前是「畫面占比」（正規化 0-1），不是物理浪高（公尺）。命名遵循全專案「座標存 0-1」慣例，但易與 WSL / 氣象的 `wave height` 混淆；詳見下方「Wave height semantics」一節。
+    - **Physical wave height in meters**（可選）:加 `--camera-height-m <H>` + (`--focal-length-mm` 或 `--sensor-height-mm`) 開啟。`H` 是相機至水面高度,focal/sensor 用於推算每個像素對應的世界深度。沒有 metadata 時,`wave_summary.physical_status="insufficient_metadata"`,`height_m_*: null`,CLI 在 stderr 印警告。詳見下方「Wave height semantics」一節與 `plans/2026-06-21-physical-wave-height-design.md`。
+    - sample.MOV 是 top-down 造浪池俯拍,在 pinhole 假設下 crest 投影到「水平線之上」(no water-plane intersection)。`height_m_*` 會是 null,但 `physical_status=computed` 且每幀 `physical.reason` 會說明失敗原因——這是 wave engine 在 top-down 場景需要拓機的已知限制,不是 schema 1.2 的問題。
 - Without activated venv: `.venv/bin/python -m surfanalysis.cli <subcommand> ...`
 
 ## Build / test
