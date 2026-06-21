@@ -102,6 +102,7 @@ def _build_camera_model(
         focal_length_mm=args.focal_length_mm,
         sensor_height_mm=args.sensor_height_mm,
         image_height_px=args.image_height_px or image_height_px,
+        pitch_deg=args.camera_pitch_deg,
     )
 
 
@@ -286,6 +287,9 @@ def _build_parser() -> argparse.ArgumentParser:
     # project image y to world Z; image_height_px defaults to the video's.
     e.add_argument("--camera-height-m", type=float, default=None,
                    help="Height of camera above water in meters (for physical wave height)")
+    e.add_argument("--camera-pitch-deg", type=float, default=None,
+                   help="Camera tilt down from horizontal in degrees "
+                        "(positive = looking down; default 0 = horizontal)")
     e.add_argument("--focal-length-mm", type=float, default=None,
                    help="Lens focal length in mm (alternative to --sensor-height-mm)")
     e.add_argument("--sensor-height-mm", type=float, default=None,
