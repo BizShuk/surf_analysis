@@ -17,7 +17,7 @@ Working:
 Known issues / to improve:
 
 - `Wave engine auto-select is mis-tuned`. `prescan` keys on camera motion, so fixed-camera pools get `static` (MOG2), which learns the steady wave into its background (`~5.7%` detection). Workaround is explicit `--wave-engine ocean`; the real fix is a foreground-stability heuristic, not a camera-motion one.
-- **Top-down scenes produce no usable physical height**. The current pinhole model assumes a roughly horizontal view of a wave at distance Z; `sample.MOV` is a top-down pool shot where the engine's crest detections land above the image horizon, so `height_m_*` is `None` even with full camera metadata. Add a `--camera-pitch-deg` flag and/or a top-down view path to handle this.
+- **`--camera-pitch-deg` works as a boolean gate, not a knob**. The height formula `h = H × (1 - tan(α_crest)/tan(α_base))` cancels pitch, so any pitch > ~0.5° produces the same answer. For top-down shots where the wave's crest image points are above the horizon at pitch=0, pass `--camera-pitch-deg 45` (or similar) to unlock the projection.
 - `Type coverage is partial`. `mypy --strict` runs on `metrics/` only; `extraction/` and `rendering/` are unchecked.
 - `Engine swap is blocked on keypoint format`. RTMPose / YOLO-pose output `COCO-17` (no heel / foot_index), which the weight-distribution and CoM metrics depend on. See [docs/pose-engines.md](docs/pose-engines.md) for the swap checklist.
 - `No real-ocean footage validated`. Only the wave-pool sample and a synthetic clip are exercised; ocean shore-break behavior of the `static` engine is untested on real data.
@@ -57,14 +57,14 @@ Detect the wave face and emit wave angle (deg) per frame + physical wave height 
 
 ```bash
 surf extract surf_session.mp4 --wave                                                    # auto engine + view
-surf extract surf_session.mp4 --wave --camera-height-m 2.5 --focal-length-mm 26 \
-                              --sensor-height-mm 4                                      # adds physical wave height (m)
+surf extract surf_session.mp4 --wave --camera-height-m 2.5 --camera-pitch-deg 45 \
+                              --focal-length-mm 26 --sensor-height-mm 4                # adds physical wave height (m)
 surf render  surf_session.mp4 surf_session.metrics.json                                # draws wave overlay (use --no-wave to skip)
 ```
 
 For standing-wave pools, prefer `--wave-engine ocean` (the color/foam detector tracks the steady face well; the MOG2 `static` engine learns steady water into its background and under-detects). The `static` engine suits fixed-camera ocean footage with transient whitewater.
 
-For physical wave height, the camera should be approximately horizontal (the pinhole model assumes a wave at distance Z in front of the camera). Top-down pool shots need a `--camera-pitch-deg` flag that doesn't exist yet (tracked above).
+For physical wave height, pass `--camera-pitch-deg` when the camera is not roughly horizontal (top-down pool shots, drone footage, etc.). The flag is a boolean gate — any pitch > ~0.5° unlocks the projection; the height value is independent of pitch in the 15-90° range.
 
 See [plans/2026-05-26-surfing-analysis-design.md](plans/2026-05-26-surfing-analysis-design.md) for the spec and [plans/2026-05-26-surfing-analysis-plan.md](plans/2026-05-26-surfing-analysis-plan.md) for the implementation plan. Physical wave height: [plans/2026-06-21-physical-wave-height-design.md](plans/2026-06-21-physical-wave-height-design.md).
 
