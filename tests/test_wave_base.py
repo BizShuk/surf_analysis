@@ -24,7 +24,9 @@ def test_to_wave_metrics_facing_uses_crest_line():
     assert m.view == "facing"
     assert m.angle_kind == "crest_tilt"
     assert m.angle_line == ((0.1, 0.30), (0.9, 0.27))
-    assert m.height == _obs().base[1] - _obs().crest[1]
+    # schema 1.2: per-frame fraction `height` is gone; physical is the new path
+    assert m.physical is None
+    assert not hasattr(m, "height")
 
 
 def test_to_wave_metrics_side_uses_face_line():

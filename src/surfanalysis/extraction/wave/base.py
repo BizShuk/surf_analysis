@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from surfanalysis.extraction.schema import EngineInfo, WaveMetrics
-from surfanalysis.metrics.wave_geometry import angle_vs_horizon_deg, normalized_height
+from surfanalysis.metrics.wave_geometry import angle_vs_horizon_deg
 
 Point = tuple[float, float]
 Line = tuple[Point, Point]
@@ -37,7 +37,6 @@ def to_wave_metrics(obs: WaveObservation, view: str) -> WaveMetrics:
     angle = angle_vs_horizon_deg(angle_line, obs.horizon_deg or 0.0)
     return WaveMetrics(
         view=view,
-        height=normalized_height(obs.crest, obs.base),
         angle_deg=angle,
         angle_kind=angle_kind,
         confidence=obs.confidence,
@@ -45,6 +44,7 @@ def to_wave_metrics(obs: WaveObservation, view: str) -> WaveMetrics:
         height_top=obs.crest,
         height_bottom=obs.base,
         horizon_deg=obs.horizon_deg,
+        physical=None,  # populated downstream by PhysicalWaveComputer
     )
 
 

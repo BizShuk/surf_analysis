@@ -65,7 +65,7 @@ def test_render_rejects_unknown_schema_version(tiny_video_and_json, tmp_path: Pa
     assert proc.returncode == 4
 
 
-def test_render_accepts_schema_1_1_with_wave(tmp_path: Path):
+def test_render_accepts_schema_1_2_with_wave(tmp_path: Path):
     video = tmp_path / "tiny.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(str(video), fourcc, 15.0, (320, 240))
@@ -87,3 +87,19 @@ def test_render_accepts_schema_1_1_with_wave(tmp_path: Path):
     )
     assert proc.returncode == 0, proc.stderr
     assert out.exists() and out.stat().st_size > 0
+
+
+def test_render_rejects_schema_1_1(tiny_video_and_json, tmp_path: Path):
+    """Per user decision 2026-06-21: schema 1.1 must NOT be silently downgraded."""
+    video, jpath = tiny_video_and_json
+    data = json.loads(jpath.read_text())
+    data["schema_version"] = "1.1"
+    jpath.write_text(json.dumps(data))
+    out = tmp_path / "out.mp4"
+    proc = subprocess.run(
+        [sys.executable, "-m", "surfanalysis.cli", "render",
+         str(video), str(jpath), "-o", str(out), "--quiet"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 4  # EXIT_SCHEMA
+    assert "1.1" in proc.stderr or "re-extract" in proc.stderr.lower()

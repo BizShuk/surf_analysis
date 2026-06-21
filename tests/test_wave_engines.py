@@ -25,7 +25,8 @@ def test_ocean_engine_detects_on_synthetic_wave():
     m = eng.detect(_ocean_frame(), 0.0)
     assert m is not None
     assert m.view == "facing"
-    assert 0.0 < m.height <= 1.0
+    # schema 1.2: physical replaces fraction; engines don't compute it
+    assert m.physical is None
     assert eng.info().name == "wave-ocean"
 
 

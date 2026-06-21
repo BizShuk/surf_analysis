@@ -67,7 +67,7 @@ def test_e2e_extract_wave_then_render(tmp_path):
     )
     assert r1.returncode == 0, r1.stderr
     data = json.loads(jpath.read_text())
-    assert data["schema_version"] == "1.1"
+    assert data["schema_version"] == "1.2"
 
     out = tmp_path / "annotated.mp4"
     r2 = subprocess.run(

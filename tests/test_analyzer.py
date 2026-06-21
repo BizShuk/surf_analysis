@@ -76,7 +76,7 @@ def test_analyzer_populates_wave_and_summary():
     frames = [np.zeros((480, 640, 3), dtype=np.uint8) for _ in range(2)]
     session = analyzer.run(frames_iter=iter(frames))
 
-    assert session.schema_version == "1.1"
+    assert session.schema_version == "1.2"
     assert session.frames[0].wave is not None
     assert session.frames[1].wave is None
     assert session.wave_summary is not None

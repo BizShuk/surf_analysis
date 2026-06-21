@@ -13,7 +13,17 @@ from tqdm import tqdm
 
 from surfanalysis.extraction.analyzer import FrameAnalyzer
 from surfanalysis.extraction.mediapipe_engine import MediaPipeEngine
-from surfanalysis.extraction.schema import SessionRecord, SourceInfo
+from surfanalysis.extraction.schema import (
+    LEGACY_NO_WAVE_SCHEMA_VERSION,
+    SCHEMA_VERSION,
+    SessionRecord,
+    SourceInfo,
+)
+
+ACCEPTED_SCHEMA_VERSIONS: tuple[str, ...] = (
+    SCHEMA_VERSION,
+    LEGACY_NO_WAVE_SCHEMA_VERSION,
+)
 
 EXIT_OK = 0
 EXIT_IO = 1
@@ -154,9 +164,13 @@ def cmd_render(args: argparse.Namespace) -> int:
         print(f"error: invalid metrics json: {e}", file=sys.stderr)
         return EXIT_SCHEMA
 
-    if session.schema_version.split(".")[0] != "1":
-        print(f"error: unsupported schema_version {session.schema_version}",
-              file=sys.stderr)
+    if session.schema_version not in ACCEPTED_SCHEMA_VERSIONS:
+        print(
+            f"error: unsupported schema_version {session.schema_version!r} "
+            f"(this build accepts {ACCEPTED_SCHEMA_VERSIONS}; "
+            f"if your file is 1.1 or earlier, re-extract with the current CLI)",
+            file=sys.stderr,
+        )
         return EXIT_SCHEMA
 
     cap = cv2.VideoCapture(str(video))
@@ -179,7 +193,6 @@ def cmd_render(args: argparse.Namespace) -> int:
     wave_overlay = WaveOverlay(
         color=args.wave_color,
         font_scale=args.font_scale,
-        height_pct=args.wave_height_pct,
     ) if args.show_wave else None
 
     progress = None if args.quiet else tqdm(total=len(session.frames), unit="frame")
@@ -238,7 +251,6 @@ def _build_parser() -> argparse.ArgumentParser:
     r.add_argument("--show-wave", action="store_true", default=True)
     r.add_argument("--no-wave", dest="show_wave", action="store_false")
     r.add_argument("--wave-color", type=str, default="#00E5FF")
-    r.add_argument("--wave-height-pct", action="store_true")
     r.add_argument("--quiet", action="store_true")
     r.set_defaults(func=cmd_render)
 

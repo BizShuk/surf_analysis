@@ -65,7 +65,7 @@ def test_extract_wave_adds_wave_fields(tiny_video: Path, tmp_path: Path):
     )
     assert proc.returncode == 0, proc.stderr
     data = json.loads(out_json.read_text())
-    assert data["schema_version"] == "1.1"
+    assert data["schema_version"] == "1.2"
     assert "wave" in data["frames"][0]          # key present (value may be null)
     assert data["wave_engine"]["name"] == "wave-static"
 

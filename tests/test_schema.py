@@ -1,21 +1,32 @@
 import pytest
 from pydantic import ValidationError
 
+from surfanalysis.extraction.exceptions import IncompatibleSchemaError
 from surfanalysis.extraction.schema import (
+    SCHEMA_VERSION,
+    SUPPORTED_SCHEMA_VERSIONS,
+    CameraModel,
     EngineInfo,
     FrameMetrics,
     FrameRecord,
     Keypoints,
+    PhysicalWaveFrame,
     SessionRecord,
     SessionSummary,
     SourceInfo,
     WaveMetrics,
-    WaveSummary,  # noqa: F401
+    WaveSummary,
 )
 
 
 def _kp_33():
     return [(0.5, 0.5, 0.0, 0.9)] * 33
+
+
+def test_schema_version_is_1_2():
+    assert SCHEMA_VERSION == "1.2"
+    assert "1.2" in SUPPORTED_SCHEMA_VERSIONS
+    assert "1.1" not in SUPPORTED_SCHEMA_VERSIONS  # hard break, no deprecation
 
 
 def test_keypoints_requires_33_points():
@@ -40,12 +51,13 @@ def test_session_record_round_trip_json():
                      params={"model_complexity": 1, "min_detection_confidence": 0.5})
     summary = SessionSummary(frames_with_detection=0, frames_total=0,
                              detection_rate=0.0, metrics_aggregate={})
-    session = SessionRecord(schema_version="1.0", source=src, engine=eng,
+    session = SessionRecord(schema_version="1.2", source=src, engine=eng,
                             stance="regular", frames=[], summary=summary)
     json_str = session.model_dump_json()
     restored = SessionRecord.model_validate_json(json_str)
     assert restored.stance == "regular"
     assert restored.source.fps == 30.0
+    assert restored.schema_version == "1.2"
 
 
 def test_frame_metrics_all_optional_except_com_and_weight():
@@ -60,15 +72,16 @@ def test_stance_must_be_regular_or_goofy():
     summary = SessionSummary(frames_with_detection=0, frames_total=0,
                              detection_rate=0.0, metrics_aggregate={})
     with pytest.raises(ValidationError):
-        SessionRecord(schema_version="1.0", source=src, engine=eng,
+        SessionRecord(schema_version="1.2", source=src, engine=eng,
                       stance="sideways", frames=[], summary=summary)
 
 
-def _wave():
+def _wave(physical: PhysicalWaveFrame | None = None) -> WaveMetrics:
     return WaveMetrics(
-        view="facing", height=0.42, angle_deg=8.3, angle_kind="crest_tilt",
+        view="facing", angle_deg=8.3, angle_kind="crest_tilt",
         confidence=0.74, angle_line=((0.18, 0.31), (0.86, 0.27)),
-        height_top=(0.52, 0.29), height_bottom=(0.52, 0.71), horizon_deg=-1.2,
+        height_top=(0.52, 0.29), height_bottom=(0.52, 0.71),
+        horizon_deg=-1.2, physical=physical,
     )
 
 
@@ -78,12 +91,13 @@ def test_wave_metrics_round_trip():
     assert restored.view == "facing"
     assert restored.angle_kind == "crest_tilt"
     assert restored.angle_line[0] == (0.18, 0.31)
+    assert restored.physical is None
 
 
 def test_wave_view_must_be_valid():
     with pytest.raises(ValidationError):
         WaveMetrics(
-            view="overhead", height=0.4, angle_deg=0.0, angle_kind="crest_tilt",
+            view="overhead", angle_deg=0.0, angle_kind="crest_tilt",
             confidence=0.5, angle_line=((0.0, 0.0), (1.0, 0.0)),
             height_top=(0.5, 0.1), height_bottom=(0.5, 0.9),
         )
@@ -106,3 +120,57 @@ def test_session_record_back_compat_v1_0_without_wave():
     assert s.wave_summary is None
     restored = SessionRecord.model_validate_json(s.model_dump_json())
     assert restored.wave_summary is None
+
+
+# --- Schema 1.2 wave_summary contract: fraction fields gone, physical in ---
+
+def test_wave_summary_no_fraction_fields():
+    summary = WaveSummary(
+        frames_detected=100, view="facing", angle_median=0.0,
+        engine="ocean", height_m_median=0.85, height_m_p90=1.10,
+        confidence="high", physical_status="computed",
+    )
+    with pytest.raises(AttributeError):
+        _ = summary.height_median  # type: ignore[attr-defined]
+    with pytest.raises(AttributeError):
+        _ = summary.height_p90  # type: ignore[attr-defined]
+
+
+def test_wave_metrics_has_physical():
+    phys = PhysicalWaveFrame(
+        crest_world=(0.0, 0.5, 3.0),
+        trough_world=(0.0, -0.35, 2.5),
+        height_m=0.85, method="camera_geometry", confidence="high",
+    )
+    wm = WaveMetrics(
+        view="facing", angle_deg=0.0, angle_kind="crest_tilt",
+        confidence=0.0, angle_line=((0.0, 0.0), (1.0, 0.0)),
+        height_top=(0.5, 0.3), height_bottom=(0.5, 0.9),
+        physical=phys,
+    )
+    assert wm.physical is phys
+    assert wm.physical.height_m == pytest.approx(0.85)
+
+
+def test_camera_model_required_fields():
+    cam = CameraModel(
+        camera_height_m=3.0, focal_length_mm=16.0, sensor_height_mm=7.0,
+        image_height_px=1080, pitch_deg=15.0, roll_deg=0.0, source="user",
+    )
+    assert cam.camera_height_m == 3.0
+    assert cam.source == "user"
+
+
+def test_physical_wave_frame_skipped_has_no_height():
+    phys = PhysicalWaveFrame(
+        method="skipped", confidence="unavailable",
+        reason="insufficient_metadata: provide --camera-height-m",
+    )
+    assert phys.height_m is None
+    assert phys.crest_world is None
+
+
+def test_incompatible_schema_error_carries_message():
+    err = IncompatibleSchemaError("schema_version='1.1' not supported")
+    assert "1.1" in str(err)
+    assert isinstance(err, Exception)

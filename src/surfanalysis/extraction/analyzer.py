@@ -9,6 +9,7 @@ import numpy as np
 
 from surfanalysis.extraction.engine import PoseEngine
 from surfanalysis.extraction.schema import (
+    SCHEMA_VERSION,
     EngineInfo,
     FrameRecord,
     Keypoints,
@@ -24,7 +25,7 @@ from surfanalysis.metrics.wave_geometry import median_p90
 Stance = Literal["regular", "goofy"]
 
 SCHEMA_VERSION_BASE = "1.0"
-SCHEMA_VERSION_WAVE = "1.1"
+SCHEMA_VERSION_WAVE = SCHEMA_VERSION
 
 
 def _kp_to_array(kp: Keypoints) -> np.ndarray:
@@ -89,15 +90,33 @@ class FrameAnalyzer:
         waves = [f.wave for f in frames if f.wave is not None]
         if not waves:
             return None
-        h_med, h_p90 = median_p90([w.height for w in waves])
+        # Schema 1.2: physical meters take over; fraction is gone. The
+        # PhysicalWaveComputer (Phase 4) populates frame.wave.physical; for
+        # Phase 2 we still aggregate angle + engine but leave physical_* None
+        # until the computer is wired in.
+        h_ms: list[float] = [
+            w.physical.height_m for w in waves
+            if w.physical is not None and w.physical.height_m is not None
+        ]
+        h_med_m: float | None = None
+        h_p90_m: float | None = None
+        if h_ms:
+            h_med_m, h_p90_m = median_p90(h_ms)
         a_med, _ = median_p90([w.angle_deg for w in waves])
         views = [w.view for w in waves]
         dom = max(set(views), key=views.count)
         view = dom if all(v == dom for v in views) else "mixed"
         engine_tag = engine_info.name.replace("wave-", "") if engine_info else "unknown"
-        return WaveSummary(frames_detected=len(waves), view=view,
-                           height_median=h_med, height_p90=h_p90,
-                           angle_median=a_med, engine=engine_tag)
+        return WaveSummary(
+            frames_detected=len(waves),
+            view=view,
+            angle_median=a_med,
+            engine=engine_tag,
+            height_m_median=h_med_m,
+            height_m_p90=h_p90_m,
+            confidence="unavailable",  # populated once wavelength cross-check lands
+            physical_status="insufficient_metadata",  # set by prescan_physical
+        )
 
 
 def _aggregate(frames: list[FrameRecord]) -> dict[str, float]:
