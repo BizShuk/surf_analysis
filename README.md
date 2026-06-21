@@ -17,7 +17,7 @@ Working:
 Known issues / to improve:
 
 - `Wave engine auto-select is mis-tuned`. `prescan` keys on camera motion, so fixed-camera pools get `static` (MOG2), which learns the steady wave into its background (`~5.7%` detection). Workaround is explicit `--wave-engine ocean`; the real fix is a foreground-stability heuristic, not a camera-motion one.
-- **`--camera-pitch-deg` works as a boolean gate, not a knob**. The height formula `h = H × (1 - tan(α_crest)/tan(α_base))` cancels pitch, so any pitch > ~0.5° produces the same answer. For top-down shots where the wave's crest image points are above the horizon at pitch=0, pass `--camera-pitch-deg 45` (or similar) to unlock the projection.
+- **`--camera-pitch-deg` is a knob, not just a gate**. The formula `h = H × (1 - tan(θ+α_crest)/tan(θ+α_base))` includes pitch; different pitches give different answers (U-shape with sweet spot around 30°–60° for typical pool shots). Sensitivity scan on `sample.MOV` (H=2.5m, focal=26mm, sensor=4mm): pitch=15°→0.53m, 30°→0.33m, 45°→0.30m, 60°→0.35m, 75°→0.60m.
 - `Type coverage is partial`. `mypy --strict` runs on `metrics/` only; `extraction/` and `rendering/` are unchecked.
 - `Engine swap is blocked on keypoint format`. RTMPose / YOLO-pose output `COCO-17` (no heel / foot_index), which the weight-distribution and CoM metrics depend on. See [docs/pose-engines.md](docs/pose-engines.md) for the swap checklist.
 - `No real-ocean footage validated`. Only the wave-pool sample and a synthetic clip are exercised; ocean shore-break behavior of the `static` engine is untested on real data.
@@ -64,7 +64,7 @@ surf render  surf_session.mp4 surf_session.metrics.json                         
 
 For standing-wave pools, prefer `--wave-engine ocean` (the color/foam detector tracks the steady face well; the MOG2 `static` engine learns steady water into its background and under-detects). The `static` engine suits fixed-camera ocean footage with transient whitewater.
 
-For physical wave height, pass `--camera-pitch-deg` when the camera is not roughly horizontal (top-down pool shots, drone footage, etc.). The flag is a boolean gate — any pitch > ~0.5° unlocks the projection; the height value is independent of pitch in the 15-90° range.
+For physical wave height, pass `--camera-pitch-deg` when the camera is not roughly horizontal (top-down pool shots, drone footage, etc.). Pitch materially affects the answer (the formula includes `θ+α`, not `α`); sweet spot for top-down pool shots is 30°–60°.
 
 See [plans/2026-05-26-surfing-analysis-design.md](plans/2026-05-26-surfing-analysis-design.md) for the spec and [plans/2026-05-26-surfing-analysis-plan.md](plans/2026-05-26-surfing-analysis-plan.md) for the implementation plan. Physical wave height: [plans/2026-06-21-physical-wave-height-design.md](plans/2026-06-21-physical-wave-height-design.md).
 
