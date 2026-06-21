@@ -5,6 +5,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from surfanalysis.extraction.wave.camera import CameraModel
 from surfanalysis.extraction.wave.motion import global_motion
 from surfanalysis.extraction.wave.ocean import wave_mask
 from surfanalysis.extraction.wave.region import region_from_mask
@@ -30,3 +31,20 @@ def prescan(frames: list[np.ndarray], n: int = 15) -> tuple[str, str]:
             votes.append(classify_view(obs.bbox[2], obs.bbox[3], obs.crest_line))
     view = max(set(votes), key=votes.count) if votes else "facing"
     return (engine_name, view)
+
+
+def prescan_physical(
+    camera_model: CameraModel | None,
+    view: str = "facing",
+) -> str:
+    """Decide `WaveSummary.physical_status` before per-frame processing.
+
+    Returns one of `"computed"`, `"insufficient_metadata"`, `"unsupported_view"`.
+    Pure function; no I/O. The actual camera intrinsics derivation happens
+    lazily inside PhysicalWaveComputer.
+    """
+    if view not in ("facing", "side"):
+        return "unsupported_view"
+    if camera_model is None:
+        return "insufficient_metadata"
+    return "computed"
