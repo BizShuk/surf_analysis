@@ -83,6 +83,28 @@ def _build_wave_engine(args: argparse.Namespace, cap: cv2.VideoCapture):
     return make_wave_engine(engine_name, view, args.min_confidence)
 
 
+def _build_camera_model(
+    args: argparse.Namespace, image_height_px: int
+):
+    """Construct a CameraModel from CLI args, or None when metadata missing.
+
+    Returns None when --camera-height-m was not supplied (caller should expect
+    physical_status='insufficient_metadata'). Raises ValueError when only
+    --camera-height-m is given without either focal_length_mm or
+    sensor_height_mm — we need at least one to derive focal_pixels.
+    """
+    from surfanalysis.extraction.wave.camera import CameraModel
+
+    if args.camera_height_m is None:
+        return None
+    return CameraModel.from_cli(
+        camera_height_m=args.camera_height_m,
+        focal_length_mm=args.focal_length_mm,
+        sensor_height_mm=args.sensor_height_mm,
+        image_height_px=args.image_height_px or image_height_px,
+    )
+
+
 def cmd_extract(args: argparse.Namespace) -> int:
     video = Path(args.video)
     out_path = Path(args.output) if args.output else video.with_suffix(".metrics.json")
@@ -115,12 +137,26 @@ def cmd_extract(args: argparse.Namespace) -> int:
             engine.close()
             return EXIT_ENGINE
 
+    camera_model = None
+    if args.wave:
+        try:
+            camera_model = _build_camera_model(args, source.height)
+        except ValueError as e:
+            print(f"error: camera metadata invalid: {e}", file=sys.stderr)
+            cap.release()
+            engine.close()
+            if wave_engine is not None:
+                wave_engine.close()
+            return EXIT_ENGINE
+
     if not args.quiet:
         print(f"[INFO] {source.width}x{source.height}, {source.fps:.2f} fps, "
               f"{source.total_frames} frames")
 
-    analyzer = FrameAnalyzer(engine=engine, stance=args.stance, source=source,
-                             wave_engine=wave_engine)
+    analyzer = FrameAnalyzer(
+        engine=engine, stance=args.stance, source=source,
+        wave_engine=wave_engine, camera_model=camera_model,
+    )
     progress = None if args.quiet else tqdm(total=source.total_frames, unit="frame")
     try:
         session = analyzer.run(_iter_frames(cap, args.max_frames, progress))
@@ -133,6 +169,18 @@ def cmd_extract(args: argparse.Namespace) -> int:
             wave_engine.close()
 
     out_path.write_text(session.model_dump_json(indent=2))
+    # Warn when wave is on but physical couldn't run (metadata missing).
+    # This is a missed-data notice, not routine info, so we surface it
+    # regardless of --quiet — silently dropping the warning is worse than
+    # one line of stderr noise in scripts.
+    ws = session.wave_summary
+    if args.wave and ws is not None and ws.physical_status == "insufficient_metadata":
+        print(
+            "[WARN] physical wave height not computed: pass "
+            "--camera-height-m (and --focal-length-mm or --sensor-height-mm) "
+            "next time for wave height in meters.",
+            file=sys.stderr,
+        )
     if not args.quiet:
         print(f"[INFO] Detection rate: {session.summary.detection_rate:.1%}")
         print(f"[INFO] Wrote {out_path}")
@@ -234,6 +282,16 @@ def _build_parser() -> argparse.ArgumentParser:
     e.add_argument("--wave", action="store_true")
     e.add_argument("--wave-engine", choices=["auto", "ocean", "static"], default="auto")
     e.add_argument("--view", choices=["auto", "facing", "side"], default="auto")
+    # Physical-wave (meters) metadata. Camera height + focal/sensor let us
+    # project image y to world Z; image_height_px defaults to the video's.
+    e.add_argument("--camera-height-m", type=float, default=None,
+                   help="Height of camera above water in meters (for physical wave height)")
+    e.add_argument("--focal-length-mm", type=float, default=None,
+                   help="Lens focal length in mm (alternative to --sensor-height-mm)")
+    e.add_argument("--sensor-height-mm", type=float, default=None,
+                   help="Sensor height in mm (alternative to --focal-length-mm)")
+    e.add_argument("--image-height-px", type=int, default=None,
+                   help="Image height in pixels (defaults to video frame height)")
     e.add_argument("--quiet", action="store_true")
     e.set_defaults(func=cmd_extract)
 
