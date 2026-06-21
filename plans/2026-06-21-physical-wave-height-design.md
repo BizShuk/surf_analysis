@@ -30,7 +30,7 @@ depends_on: 2026-06-15-wave-analysis-design.md (schema_version 1.1)
 - 多相機立體、SfM、IMU 整合;手持 / POV 影片只給 `confidence: low` 不報數。
 - 絕對精度校正（驗證集 / 量測真值）— 本次只給演算法 + 路徑,精度評估留待樣本齊備後。
 - 替換 `ocean` / `static` 引擎;既有 engine 介面不動,`PhysicalWaveComputer` 是純下游消費者。
-- 移除 deprecated `height_*` 欄位（保留到 schema 2.0,給下游半年過渡）。
+- 向下相容舊 fraction 欄位：**本次直接 break**,`height_median` / `height_p90` 從 schema 1.2 移除（user 2026-06-21 確認）。
 
 `需求決策來源`
 
@@ -40,11 +40,11 @@ depends_on: 2026-06-15-wave-analysis-design.md (schema_version 1.1)
 2. 不接受以衝浪者當 reference scale → 排除所有依賴 pose 的尺度推算。
 3. 移除 `height` (fraction) 欄位、新欄位命名為 `wave_height` / `physical_height`（公尺）→ 對齊 WSL / 氣象語意。
 
-設計選擇（須 user 在實作前再確認）：
+設計選擇（user 2026-06-21 確認）：
 
-- 保留 deprecated `height_*` 半年 vs 直接 break。預設保留（schema 1.2）。
-- `confidence` 計算閾值（method 1+2 差多少算「分歧」）。預設 `|ΔH/H| > 0.20` = `low`。
-- 不齊 metadata 時的 UX:自動 fallback 到 fraction + 警告,還是強制要 metadata？預設 fallback + 警告。
+- **break 政策**:直接移除 `height_median` / `height_p90`,**不保留 deprecated**;reader 讀舊 1.1 metrics.json 必須明確報「schema 不相容」而非靜默降級。
+- **confidence 閾值**:`|ΔH/H| > 0.20` = `low`;`≤ 0.20` = `high` / `medium` 視單/雙路徑而定。
+- **缺 metadata 的 UX**:fallback 到舊 fraction 行為 + 顯示警告（讓舊用法不退步,但 UI 明顯標示「這是 fraction,非公尺」）;不強制要 metadata 才能跑。
 
 ---
 
@@ -168,9 +168,9 @@ WavelengthEstimate(
    ┌───────────────────────────┐   ┌──────────────────────────┐
    │ extraction package        │   │  rendering package       │
    │                           │   │                          │
-   │  WaveEngine ──────┐       │   │ WaveOverlay (existing)   │
-   │   ├ ocean         │       │   │  ├ (m) + confidence 徽章 │
-   │   └ static        │       │   │  ├ (fraction) [legacy]   │
+   │  WaveEngine ──────┐       │   │ WaveOverlay (modified)   │
+   │   ├ ocean         │       │   │  └ (m) + confidence 徽章 │
+   │   └ static        │       │   │                          │
    │  PhysicalComputer │ NEW   │   │                          │
    │   ├ CameraModel   │ NEW   │   │                          │
    │   ├ WaveGeometry  │ NEW   │   │                          │
@@ -227,9 +227,9 @@ class WaveSummary(BaseModel):
 
 **向下相容**
 
-- `metrics.json` 1.1 reader 讀 1.2:忽略新欄位,舊欄位仍可用。
-- 1.2 reader 讀 1.1:`physical` / `height_m_*` 為 `None`,`physical_status` = `"insufficient_metadata"`;UI 顯示「需要 metadata 升級到 1.2」提示。
-- `height_median` / `height_p90`(fraction)標 `deprecated`,`schema.py` 加 `model_config = ConfigDict(deprecated_fields_warn=True)` 或寫進 docstring,不強制移除。
+- **reader 讀 1.1 metrics.json**:`WaveMetrics` 找不到 `physical` 欄位 → 拋 `IncompatibleSchemaError`(`schema.py` 加自訂 exception),CLI 印「schema 1.1 不再支援,請用 1.2 重新 extract」並 exit 2。**不靜默降級**——這是 user 確認的 break 政策。
+- **renderer 接受多版本**:不變（既有 1.0/1.1/1.2 接受邏輯保留,只是不再用 fraction 欄位）。
+- `WaveMetrics` / `WaveSummary` **完全移除** `height_median` / `height_p90` / `WaveMetrics.height` 欄位;`schema_version: Literal["1.2"]` 嚴格化。
 
 ---
 
@@ -246,21 +246,19 @@ surf extract <video>
 
 surf render <video> <metrics.json>
     [--no-wave]
-    [--legacy-screen-fraction]           # 顯示舊 fraction 而非 m（debug 用）
 ```
 
-`--camera-height-m` 缺值時,EXIF 無法推得 → 整個 physical pass 跳過,`physical_status = "insufficient_metadata"`,`metrics.json` 仍輸出但 `physical: None`,`height_m_*: None`;既有的 fraction 結果照樣可用。這保證舊用法不退步。
+`--camera-height-m` 缺值時,EXIF 無法推得 → 整個 physical pass 跳過,`physical_status = "insufficient_metadata"`,`metrics.json` 仍輸出但 `physical: None`,`height_m_*: None`;CLI 在結束前 print warning「要 m 單位請提供 `--camera-height-m`」,**舊 fraction 結果不輸出**（user 確認 break 政策）。
 
 ---
 
 ## 7. Overlay 變更
 
-`wave_overlay.py` 顯示規則：
+`wave_overlay.py` 顯示規則（**不再有 fraction fallback**,user 確認 break）：
 
 - `WaveSummary.physical_status == "computed"` → 顯示 `H = 0.85 m (±0.10, confidence: high)`,數字 + 信賴區間 + 信心徽章。
-- `physical_status == "insufficient_metadata"` → 顯示舊 fraction,並加小字「要 m 單位請加 `--camera-height-m`」。
+- `physical_status == "insufficient_metadata"` → 顯示「需要 `--camera-height-m` 才有 m 單位」,不報任何數字。
 - `physical_status == "unsupported_view"`（例如 handheld POV）→ 顯示「不支援物理量」,不報數。
-- `--legacy-screen-fraction` 強制走舊路徑（debug / A/B 比對）。
 
 ---
 
