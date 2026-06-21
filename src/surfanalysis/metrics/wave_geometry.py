@@ -119,16 +119,22 @@ def wave_height_meters(
     Assumes base is on the water surface (Y=0) and the wave is thin enough
     that crest and base share the same depth. Derivation:
 
-        Z_base = H / tan(alpha_base)
-        Y_crest = H - Z_base * tan(alpha_crest)
-                = H * (1 - tan(alpha_crest) / tan(alpha_base))
+        Z_base = H / tan(theta + alpha_base)
+        Y_crest = H - Z_base * tan(theta + alpha_crest)
+                = H * (1 - tan(theta + alpha_crest) / tan(theta + alpha_base))
 
-    Returns |Y_crest - Y_base| = |Y_crest| since Y_base = 0.
+    where `theta` is the camera pitch and `alpha_*` are angles from the optical
+    axis. Returns |Y_crest - Y_base| = |Y_crest| since Y_base = 0.
+
+    Note: at pitch=0 this collapses to the simpler
+    `H * (1 - tan(alpha_crest) / tan(alpha_base))` (the previous form),
+    because tan(0 + alpha) = tan(alpha).
     """
     if intr.camera_height_m <= 0:
         raise ValueError("camera_height_m must be > 0")
-    alpha_crest = _alpha_rad(crest[1], intr)
-    alpha_base = _alpha_rad(base[1], intr)
+    theta = math.radians(intr.pitch_deg)
+    alpha_crest = theta + _alpha_rad(crest[1], intr)
+    alpha_base = theta + _alpha_rad(base[1], intr)
     tan_crest = math.tan(alpha_crest)
     tan_base = math.tan(alpha_base)
     if tan_base <= 0:

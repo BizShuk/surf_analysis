@@ -96,3 +96,24 @@ def test_normalized_to_world_height_invalid_intrinsics():
                             image_height_px=1080, pitch_deg=0.0)
     with pytest.raises(ValueError, match="camera_height_m"):
         normalized_to_world_height((0.5, 0.5), intr)
+
+
+def test_wave_height_from_observations_pitch_sensitive():
+    # Regression test: the formula must include pitch_deg.
+    # Earlier bug: h = H * (1 - tan(α_crest)/tan(α_base)) ignored pitch,
+    # giving the same answer for all pitches (which was the user's catch).
+    # Correct formula: h = H * (1 - tan(θ+α_crest)/tan(θ+α_base))
+    intr0 = CameraIntrinsics(3.0, 1080.0, 1080, pitch_deg=0.0)
+    intr45 = CameraIntrinsics(3.0, 1080.0, 1080, pitch_deg=45.0)
+    crest = (0.5, 684.0 / 1080.0)
+    base = (0.5, 756.0 / 1080.0)
+    h0 = wave_height_meters(crest, base, intr0)
+    h45 = wave_height_meters(crest, base, intr45)
+    # At pitch=0 the formula collapses to the simple form (test_wave_height_from_observations
+    # already covers that), so h0 ≈ 1.0m.
+    assert h0 == pytest.approx(1.0, rel=0.05)
+    # At pitch=45°, the same image points give a meaningfully different answer —
+    # NOT the same value as pitch=0.
+    assert h45 != pytest.approx(h0, rel=0.05)
+    # The answer is positive and physically reasonable (not > camera_height_m).
+    assert 0 < h45 < intr45.camera_height_m
