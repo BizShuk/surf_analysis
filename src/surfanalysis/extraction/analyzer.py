@@ -19,6 +19,9 @@ from surfanalysis.extraction.schema import (
     WaveSummary,
 )
 from surfanalysis.extraction.wave.base import WaveEngine
+from surfanalysis.extraction.wave.camera import CameraModel
+from surfanalysis.extraction.wave.physical import PhysicalWaveComputer
+from surfanalysis.extraction.wave.prescan import prescan_physical
 from surfanalysis.metrics import StabilityWindow, compute_frame_metrics
 from surfanalysis.metrics.wave_geometry import median_p90
 
@@ -32,13 +35,40 @@ def _kp_to_array(kp: Keypoints) -> np.ndarray:
     return np.array(kp.points, dtype=np.float64)
 
 
+_CONFIDENCE_RANK = {"high": 3, "medium": 2, "low": 1, "unavailable": 0}
+
+
+def _aggregate_confidence(
+    waves: list,  # list[WaveMetrics] (annotated loose to avoid schema import cycle)
+) -> Literal["high", "medium", "low", "unavailable"]:
+    """Best confidence across frames; `unavailable` only if every frame is."""
+    best = "unavailable"
+    best_rank = 0
+    for w in waves:
+        if w.physical is None:
+            continue
+        rank = _CONFIDENCE_RANK.get(w.physical.confidence, 0)
+        if rank > best_rank:
+            best_rank = rank
+            best = w.physical.confidence
+    return best
+
+
 class FrameAnalyzer:
     def __init__(self, engine: PoseEngine, stance: Stance, source: SourceInfo,
-                 wave_engine: WaveEngine | None = None) -> None:
+                 wave_engine: WaveEngine | None = None,
+                 camera_model: CameraModel | None = None) -> None:
         self._engine = engine
         self._stance = stance
         self._source = source
         self._wave_engine = wave_engine
+        self._camera_model = camera_model
+        # Always have a computer so per-frame physical is populated even when
+        # metadata is missing (skipped frame with reason). Without this, the
+        # schema would have a wave but no physical evidence for the absence.
+        self._physical_computer: PhysicalWaveComputer = PhysicalWaveComputer(
+            camera_model=camera_model,
+        )
 
     def run(self, frames_iter: Iterable[np.ndarray]) -> SessionRecord:
         frames: list[FrameRecord] = []
@@ -48,6 +78,12 @@ class FrameAnalyzer:
         for idx, frame in enumerate(frames_iter):
             ts_ms = (idx / self._source.fps) * 1000.0 if self._source.fps > 0 else 0.0
             wave = self._wave_engine.detect(frame, ts_ms) if self._wave_engine else None
+            # Populate physical height for every wave frame. When camera
+            # metadata is missing, the computer returns a 'skipped' frame
+            # with a reason — better than leaving physical=None which would
+            # hide the cause from downstream consumers.
+            if wave is not None:
+                wave.physical = self._physical_computer.compute(wave)
             kp = self._engine.detect(frame, ts_ms)
             if kp is None:
                 stability.push(None)
@@ -64,7 +100,7 @@ class FrameAnalyzer:
         version = SCHEMA_VERSION_WAVE if self._wave_engine else SCHEMA_VERSION_BASE
         wave_engine_info = self._wave_engine.info() if self._wave_engine else None
         wave_summary = (
-            self._aggregate_wave(frames, wave_engine_info)
+            self._aggregate_wave(frames, wave_engine_info, self._camera_model)
             if self._wave_engine else None
         )
         return SessionRecord(
@@ -85,18 +121,20 @@ class FrameAnalyzer:
 
     @staticmethod
     def _aggregate_wave(
-        frames: list[FrameRecord], engine_info: EngineInfo | None
+        frames: list[FrameRecord], engine_info: EngineInfo | None,
+        camera_model: CameraModel | None = None,
     ) -> WaveSummary | None:
         waves = [f.wave for f in frames if f.wave is not None]
         if not waves:
             return None
-        # Schema 1.2: physical meters take over; fraction is gone. The
-        # PhysicalWaveComputer (Phase 4) populates frame.wave.physical; for
-        # Phase 2 we still aggregate angle + engine but leave physical_* None
-        # until the computer is wired in.
+        # Physical heights: only count frames where confidence is high or
+        # medium. low / unavailable frames still get written per-frame for
+        # diagnostics but shouldn't bias the session aggregate.
         h_ms: list[float] = [
             w.physical.height_m for w in waves
-            if w.physical is not None and w.physical.height_m is not None
+            if w.physical is not None
+            and w.physical.height_m is not None
+            and w.physical.confidence in ("high", "medium")
         ]
         h_med_m: float | None = None
         h_p90_m: float | None = None
@@ -107,6 +145,16 @@ class FrameAnalyzer:
         dom = max(set(views), key=views.count)
         view = dom if all(v == dom for v in views) else "mixed"
         engine_tag = engine_info.name.replace("wave-", "") if engine_info else "unknown"
+
+        # physical_status: derived from prescan_physical (CLI decides the
+        # view; for the default facing view, this is "computed" iff camera
+        # model was provided). When the CLI doesn't pass camera_model, the
+        # analyzer still produces waves (without physical), and status falls
+        # back to "insufficient_metadata" since no frame can have physical.
+        view = "facing" if view in ("facing", "mixed") else view
+        physical_status = prescan_physical(camera_model, view)
+        confidence = _aggregate_confidence(waves)
+
         return WaveSummary(
             frames_detected=len(waves),
             view=view,
@@ -114,8 +162,9 @@ class FrameAnalyzer:
             engine=engine_tag,
             height_m_median=h_med_m,
             height_m_p90=h_p90_m,
-            confidence="unavailable",  # populated once wavelength cross-check lands
-            physical_status="insufficient_metadata",  # set by prescan_physical
+            confidence=confidence,
+            physical_status=physical_status,  # type: ignore[arg-type]
+            camera=camera_model.schema if camera_model is not None else None,
         )
 
 

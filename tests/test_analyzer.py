@@ -91,3 +91,55 @@ def test_analyzer_without_wave_engine_stays_v1_0():
     session = analyzer.run(frames_iter=iter([np.zeros((480, 640, 3), dtype=np.uint8)]))
     assert session.schema_version == "1.0"
     assert session.wave_summary is None
+
+
+def test_analyzer_populates_physical_when_camera_model_provided():
+    from surfanalysis.extraction.wave.camera import CameraModel
+
+    src = SourceInfo(path="x.mp4", width=1080, height=1080, fps=30.0,
+                     total_frames=2, duration_ms=66.0)
+    engine = MockEngine(sequence=[_placed_kp(), _placed_kp()])
+    wave = MockWaveEngine([_wave_metrics(), _wave_metrics()])
+    cam = CameraModel.from_cli(
+        camera_height_m=3.0, focal_length_mm=16.0,
+        sensor_height_mm=7.0, image_height_px=1080,
+    )
+    analyzer = FrameAnalyzer(
+        engine=engine, stance="regular", source=src,
+        wave_engine=wave, camera_model=cam,
+    )
+    frames = [np.zeros((1080, 1080, 3), dtype=np.uint8) for _ in range(2)]
+    session = analyzer.run(frames_iter=iter(frames))
+
+    assert session.wave_summary is not None
+    assert session.wave_summary.physical_status == "computed"
+    assert session.wave_summary.camera is not None
+    assert session.wave_summary.camera.camera_height_m == 3.0
+    # Each frame should have a PhysicalWaveFrame attached
+    assert all(f.wave.physical is not None for f in session.frames if f.wave)
+    # Without wavelength cross-check, single-source gets 'medium' confidence
+    assert session.wave_summary.confidence in ("medium", "high", "low")
+
+
+def test_analyzer_marks_insufficient_metadata_when_no_camera():
+    src = SourceInfo(path="x.mp4", width=1080, height=1080, fps=30.0,
+                     total_frames=1, duration_ms=33.0)
+    engine = MockEngine(sequence=[_placed_kp()])
+    wave = MockWaveEngine([_wave_metrics()])
+    analyzer = FrameAnalyzer(
+        engine=engine, stance="regular", source=src, wave_engine=wave,
+        # camera_model=None: PhysicalWaveComputer skipped
+    )
+    frames = [np.zeros((1080, 1080, 3), dtype=np.uint8)]
+    session = analyzer.run(frames_iter=iter(frames))
+
+    assert session.wave_summary is not None
+    assert session.wave_summary.physical_status == "insufficient_metadata"
+    assert session.wave_summary.camera is None
+    assert session.wave_summary.height_m_median is None
+    assert session.wave_summary.confidence == "unavailable"
+    # per-frame physical should still be set (skipped frames carry the reason)
+    frame_wave = session.frames[0].wave
+    assert frame_wave is not None
+    assert frame_wave.physical is not None
+    assert frame_wave.physical.method == "skipped"
