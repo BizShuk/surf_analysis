@@ -1,0 +1,16 @@
+{
+  "name": "surf-analysis",
+  "version": "0.0.0",
+  "private": true,
+  "description": "衝浪影片生物力學分析 (surfing video biomechanics) — MediaPipe Pose 抽取 keypoints，輸出 metrics JSON 與標註影片",
+  "scripts": {
+    "dev": ".venv/bin/python -m surfanalysis.cli --help",
+    "test": ".venv/bin/python -m pytest",
+    "build": "python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'",
+    "lint": "npx npm-run-all --parallel lint:*",
+    "lint:ruff": ".venv/bin/python -m ruff check .",
+    "lint:types": ".venv/bin/python -m mypy",
+    "clean": "rm -rf .venv dist build src/*.egg-info .pytest_cache .mypy_cache .ruff_cache",
+    "ci": "npm run lint && npm run test"
+  }
+}
