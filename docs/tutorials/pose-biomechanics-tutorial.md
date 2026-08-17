@@ -342,6 +342,6 @@ flowchart LR
 ### 6.4 延伸閱讀
 
 - `CLAUDE.md` — 專案結構與技術決策
-- `plans/video_format_decision.md` — 影片格式 (Container / Codec) 決策指南
+- `plans/2026-06-10-video-format-decision.md` — 影片格式 (Container / Codec) 決策指南
 - `plans/2026-05-26-surfing-analysis-design.md` — 完整設計規格
 - MediaPipe Pose 官方文件：<https://developers.google.com/mediapipe/solutions/vision/pose_landmarker>
