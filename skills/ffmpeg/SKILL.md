@@ -14,6 +14,7 @@ disable-model-invocation: false
 effort: low
 context: fork
 metadata:
+    source: https://github.com/BizShuk/surf_analysis
     type: reference
     platforms: [macos, linux]
     verified: 2026-06-10
