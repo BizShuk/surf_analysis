@@ -1,5 +1,5 @@
 {
-  "name": "surf-analysis",
+  "name": "surf_analysis",
   "version": "0.0.0",
   "private": true,
   "description": "衝浪影片生物力學分析 (surfing video biomechanics) — MediaPipe Pose 抽取 keypoints，輸出 metrics JSON 與標註影片",
